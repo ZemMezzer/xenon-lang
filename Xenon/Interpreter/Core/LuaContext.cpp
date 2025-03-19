@@ -41,15 +41,22 @@ std::unique_ptr<LuaState> LuaContext::newState() {
 std::unique_ptr<LuaState> LuaContext::newState(const LuaEnvironment &env) {
 	std::unique_ptr<LuaState> L = std::make_unique<LuaState>();
 	luaL_openlibs(*L);
+	
 	for(const auto &lib : libraries ) {
 		((std::shared_ptr<LuaLibrary>) lib.second)->RegisterFunctions(*L);
 	}
 	for(const auto &var : env) {
 		((std::shared_ptr<LuaType>) var.second)->PushGlobal(*L, var.first);
 	}
+	for (auto &function : functions)
+	{
+		auto& func = function.second;
+		lua_pushcfunction(*L, func.getCFunction());
+		lua_setglobal(*L, function.first.c_str());
+	}
 	lua_pushstring(*L, std::string(LuaCpp::Version).c_str());
 	lua_setglobal(*L, "_luacppversion");
-
+	
 	return L;
 }
 
@@ -149,6 +156,14 @@ void LuaContext::RunWithEnvironment(const std::string &name, const LuaEnvironmen
 void LuaContext::AddLibrary(std::shared_ptr<Registry::LuaLibrary> &library) {
 	libraries[library->getName()] = std::move(library);
 }
+
+void LuaContext::AddCFunction(const std::string &name, lua_CFunction function)
+{
+	std::unique_ptr<LuaCFunction> func = std::make_unique<LuaCFunction>(function);
+	func->setName(name);
+	functions.insert(std::make_pair(name, std::move(*func)));
+}
+
 
 void LuaContext::AddGlobalVariable(const std::string &name, std::shared_ptr<Engine::LuaType> var) {
 	globalEnvironment[name] = std::move(var);

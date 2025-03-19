@@ -1,9 +1,18 @@
-#include "Core/Lua.hpp"
-#include "Core/LuaContext.hpp"
-#include "Core/Registry/LuaCodeSnippet.hpp"
+#include "Interpreter.h"
+#include "src/libs/StandartLib.h"
 
-
-void load_script()
+Interpreter::Interpreter()
 {
-    
+    context = LuaCpp::LuaContext();
 }
+
+void Interpreter::loadLib(Lib* lib)
+{
+    lib->loadLib(context);
+}
+
+void Interpreter::loadScript(const char* script)
+{
+    context.CompileStringAndRun(script);
+}
+

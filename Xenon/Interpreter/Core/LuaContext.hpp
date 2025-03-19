@@ -63,6 +63,11 @@ namespace LuaCpp {
 		std::map<std::string, std::shared_ptr<Registry::LuaLibrary>> libraries;
 
 		/**
+		 * Custom 'C' functions
+		 */
+		std::map<std::string, Registry::LuaCFunction> functions;
+
+		/**
 		 *
 		 */
 		LuaEnvironment globalEnvironment;
@@ -77,7 +82,7 @@ namespace LuaCpp {
 		 * for the communication with the Lua virtual machine
 		 * from the high level APIs.
 		 */
-		LuaContext() : registry(), libraries(), globalEnvironment() {};
+		LuaContext() : registry(), libraries(), functions(), globalEnvironment() {};
 		~LuaContext() {};
 
 		/**
@@ -378,6 +383,8 @@ namespace LuaCpp {
 		* @param library The library containing `C` functions
 		*/
 		void AddLibrary(std::shared_ptr<Registry::LuaLibrary> &library);
+		
+		void AddCFunction(const std::string &name, lua_CFunction function);
 
 		/**
 		 * @brief Add a global variable

@@ -121,7 +121,7 @@ static int doargs(int argc, char* argv[])
  return i;
 }
 
-#define FUNCTION "(function()end)();"
+#define FUNCTION "(function()end)();\n"
 
 static const char* reader(lua_State* L, void* ud, size_t* size)
 {
@@ -138,7 +138,7 @@ static const char* reader(lua_State* L, void* ud, size_t* size)
  }
 }
 
-#define toproto(L,i) getproto(s2v(L->top+(i)))
+#define toproto(L,i) getproto(s2v(L->top.p+(i)))
 
 static const Proto* combine(lua_State* L, int n)
 {
@@ -155,7 +155,6 @@ static const Proto* combine(lua_State* L, int n)
    f->p[i]=toproto(L,i-n-1);
    if (f->p[i]->sizeupvalues>0) f->p[i]->upvalues[0].instack=0;
   }
-  f->sizelineinfo=0;
   return f;
  }
 }
@@ -194,21 +193,21 @@ static int pmain(lua_State* L)
  return 0;
 }
 
-// int main(int argc, char* argv[])
-// {
-//  lua_State* L;
-//  int i=doargs(argc,argv);
-//  argc-=i; argv+=i;
-//  if (argc<=0) usage("no input files given");
-//  L=luaL_newstate();
-//  if (L==NULL) fatal("cannot create state: not enough memory");
-//  lua_pushcfunction(L,&pmain);
-//  lua_pushinteger(L,argc);
-//  lua_pushlightuserdata(L,argv);
-//  if (lua_pcall(L,2,0,0)!=LUA_OK) fatal(lua_tostring(L,-1));
-//  lua_close(L);
-//  return EXIT_SUCCESS;
-// }
+int main(int argc, char* argv[])
+{
+ lua_State* L;
+ int i=doargs(argc,argv);
+ argc-=i; argv+=i;
+ if (argc<=0) usage("no input files given");
+ L=luaL_newstate();
+ if (L==NULL) fatal("cannot create state: not enough memory");
+ lua_pushcfunction(L,&pmain);
+ lua_pushinteger(L,argc);
+ lua_pushlightuserdata(L,argv);
+ if (lua_pcall(L,2,0,0)!=LUA_OK) fatal(lua_tostring(L,-1));
+ lua_close(L);
+ return EXIT_SUCCESS;
+}
 
 /*
 ** print bytecodes
@@ -600,11 +599,11 @@ static void PrintCode(const Proto* f)
 	if (c==0) printf("all out"); else printf("%d out",c-1);
 	break;
    case OP_TAILCALL:
-	printf("%d %d %d",a,b,c);
+	printf("%d %d %d%s",a,b,c,ISK);
 	printf(COMMENT "%d in",b-1);
 	break;
    case OP_RETURN:
-	printf("%d %d %d",a,b,c);
+	printf("%d %d %d%s",a,b,c,ISK);
 	printf(COMMENT);
 	if (b==0) printf("all out"); else printf("%d out",b-1);
 	break;
@@ -619,7 +618,7 @@ static void PrintCode(const Proto* f)
 	break;
    case OP_FORPREP:
 	printf("%d %d",a,bx);
-	printf(COMMENT "to %d",pc+bx+2);
+	printf(COMMENT "exit to %d",pc+bx+3);
 	break;
    case OP_TFORPREP:
 	printf("%d %d",a,bx);
