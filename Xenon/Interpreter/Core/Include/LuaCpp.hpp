@@ -22,15 +22,27 @@
    SOFTWARE.
    */
 
-#ifndef LUACPP_LUA_HPP
-#define LUACPP_LUA_HPP
+#ifndef LUACPP_LUACPP_HPP
+#define LUACPP_LUACPP_HPP
 
-#ifdef __cplusplus
-  extern "C" {
-     #include "Lua/lua.h"
-     #include "Lua/lualib.h"
-     #include "Lua/lauxlib.h"
-  }
-#endif //__cplusplus
+#include "LuaVersion.hpp"
+#include "Lua.hpp"
+#include "LuaContext.hpp"
+#include "LuaMetaObject.hpp"
 
-#endif // LUACPP_LUA_HPP
+#include "LuaState.hpp"
+#include "LuaType.hpp"
+#include "LuaTNil.hpp"
+#include "LuaTString.hpp"
+#include "LuaTBoolean.hpp"
+#include "LuaTNumber.hpp"
+#include "LuaTTable.hpp"
+#include "LuaTUserData.hpp"
+
+#include "LuaCompiler.hpp"
+#include "LuaRegistry.hpp"
+#include "LuaCodeSnippet.hpp"
+#include "LuaLibrary.hpp"
+#include "LuaCFunction.hpp"
+
+#endif //LUACPP_LUACPP_HPP

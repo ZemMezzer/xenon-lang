@@ -2,3 +2,7 @@
 Xenon/Debug
 Xenon/Interpreter/Debug
 Xenon/InterpreterTest/Debug
+.idea
+cmake-build-debug
+*.o
+*.a

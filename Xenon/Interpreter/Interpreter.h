@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "src/libs/Lib.h"
+#include "Lib.h"
 
 class Interpreter
 {

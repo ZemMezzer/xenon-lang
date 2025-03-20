@@ -28,7 +28,7 @@
 
 #include <map>
 
-#include "../Lua.hpp"
+#include "Lua.hpp"
 #include "LuaState.hpp"
 #include "LuaType.hpp"
 

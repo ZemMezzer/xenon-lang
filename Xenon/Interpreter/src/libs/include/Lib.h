@@ -1,5 +1,6 @@
 ﻿#pragma once
-#include "../../Core/LuaContext.hpp"
+
+#include "LuaContext.hpp"
 
 class Lib
 {

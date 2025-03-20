@@ -1,8 +1,8 @@
 #pragma once
 #include "Lua.hpp"
 
-#include "Lua/lauxlib.h"
-#include "Lua/lua.h"
+#include "lauxlib.h"
+#include "lua.h"
 
 enum class LuaScriptType
 {

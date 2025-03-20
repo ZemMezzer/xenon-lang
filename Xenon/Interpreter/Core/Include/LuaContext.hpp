@@ -27,10 +27,10 @@
 
 #include <memory>
 
-#include "Registry/LuaRegistry.hpp"
-#include "Registry/LuaLibrary.hpp"
-#include "Engine/LuaState.hpp"
-#include "Engine/LuaType.hpp"
+#include "LuaRegistry.hpp"
+#include "LuaLibrary.hpp"
+#include "LuaState.hpp"
+#include "LuaType.hpp"
 
 namespace LuaCpp {
 	/**

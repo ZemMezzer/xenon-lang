@@ -28,7 +28,7 @@
 
 #include <ostream>
 
-#include "../Lua.hpp"
+#include "Lua.hpp"
 
 namespace LuaCpp {
 	/**

@@ -26,7 +26,7 @@
 #ifndef LUACPP_LUATYPE_HPP
 #define LUACPP_LUATYPE_HPP
 
-#include "../Lua.hpp"
+#include "Lua.hpp"
 #include "LuaState.hpp"
 
 namespace LuaCpp {

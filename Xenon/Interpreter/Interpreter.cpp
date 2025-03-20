@@ -1,5 +1,6 @@
 #include "Interpreter.h"
-#include "src/libs/StandartLib.h"
+
+#include <Lib.h>
 
 Interpreter::Interpreter()
 {

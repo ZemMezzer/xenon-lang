@@ -29,8 +29,8 @@
 #include <memory>
 
 #include "Lua.hpp"
-#include "Engine/LuaState.hpp"
-#include "Engine/LuaTUserData.hpp"
+#include "LuaState.hpp"
+#include "LuaTUserData.hpp"
 
 namespace LuaCpp {
 

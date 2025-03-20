@@ -2,5 +2,5 @@
 
 void StandartLib::loadLib(LuaCpp::LuaContext& context)
 {
-    
+
 }

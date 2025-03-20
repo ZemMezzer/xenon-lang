@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "Lib.h"
-#include "../../Core/LuaContext.hpp"
 
 class StandartLib : public Lib
 {

@@ -28,9 +28,9 @@
 #include <string>
 #include <map>
 
-#include "../Lua.hpp"
+#include "Lua.hpp"
 #include "LuaCFunction.hpp"
-#include "../Engine/LuaState.hpp"
+#include "LuaState.hpp"
 
 namespace LuaCpp {
 	namespace Registry {
