@@ -1,26 +1,26 @@
+#include <cstddef>
 extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
 }
 #include <cstdlib>
 #include <cstring>
-#include <cstdint>
 #include "pointer.h"
 
-struct Pointer {
-    uint8_t* address;
-    bool is_owned;
+void Pointer::alloc(size_t size){
+    set((uint8_t*)malloc(size), size, true);
+}
 
-    void set(uint8_t* pointer_address, bool owned){
-        address = pointer_address;
-        is_owned = owned;
-    }
+void Pointer::set(uint8_t* pointer_address, size_t pointer_size, bool owned){
+    size = pointer_size;
+    address = pointer_address;
+    is_owned = owned;
+}
 
-    void free_pointer(){
-        free(address);
-        address = nullptr;
-    }
-};
+void Pointer::free_pointer() {
+    free(address);
+    address = nullptr;
+}
 
 static Pointer* check_ptr(lua_State* L, int idx) {
     return (Pointer*)luaL_checkudata(L, idx, "Pointer");
@@ -29,7 +29,7 @@ static Pointer* check_ptr(lua_State* L, int idx) {
 static int l_ptr_new(lua_State* L) {
     size_t size = luaL_checkinteger(L, 1);
     Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
-    p->set((uint8_t*)malloc(size), true);
+    p->alloc(size);
     luaL_getmetatable(L, "Pointer");
     lua_setmetatable(L, -2);
     return 1;
@@ -38,7 +38,7 @@ static int l_ptr_new(lua_State* L) {
 static int l_ptr_from(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
     Pointer* np = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
-    np->set(p->address, false);
+    np->set(p->address, p->size, false);
 
     luaL_getmetatable(L, "Pointer");
     lua_setmetatable(L, -2);
@@ -68,29 +68,17 @@ static int l_ptr_setbyte(lua_State* L) {
     return 0;
 }
 
-static int l_ptr_get_int32(lua_State* L) {
+static int l_ptr_getsize(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
-    size_t offset = luaL_checkinteger(L, 2);
-    int32_t val;
-    std::memcpy(&val, p->address + offset, sizeof(val));
-    lua_pushinteger(L, val);
+    lua_pushinteger(L, p->size);
     return 1;
-}
-
-static int l_ptr_set_int32(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
-    size_t offset = luaL_checkinteger(L, 2);
-    int32_t val = luaL_checkinteger(L, 3);
-    std::memcpy(p->address + offset, &val, sizeof(val));
-    return 0;
 }
 
 static const luaL_Reg ptr_methods[] = {
     {"free", l_ptr_free},
     {"get_byte", l_ptr_getbyte},
     {"set_byte", l_ptr_setbyte},
-    {"get_int32", l_ptr_get_int32},
-    {"set_int32", l_ptr_set_int32},
+    {"get_size", l_ptr_getsize},
     {NULL, NULL}
 };
 

@@ -1,5 +1,6 @@
-project(xenon-lang)
 cmake_minimum_required(VERSION 3.29)
+
+project(xenon-lang)
 
 add_subdirectory(core)
 
