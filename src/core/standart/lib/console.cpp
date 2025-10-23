@@ -7,6 +7,14 @@ extern "C" {
 
 static const char* type_name = "Console";
 
+static int l_console_readln(lua_State* L) {
+    std::string input;
+    std::getline(std::cin, input);
+
+    lua_pushlstring(L, input.c_str(), input.size());
+    return 1;
+}
+
 static int l_console_write(lua_State* L) {
 
     int top_index = get_function_arg_top_index(L);
@@ -74,6 +82,7 @@ static int l_console_write_line(lua_State* L) {
 static const luaL_Reg console_lib[] = {
     {"write", l_console_write},
     {"writeln", l_console_write_line},
+    {"readln", l_console_readln},
     {NULL, NULL}
 };
 
