@@ -1,7 +1,11 @@
 project(xenon-core)
 
 add_subdirectory(lua)
+add_subdirectory(standart)
 
 add_library(${PROJECT_NAME} INTERFACE)
 
-target_link_libraries(${PROJECT_NAME} INTERFACE xenon-lua)
+target_link_libraries(${PROJECT_NAME} INTERFACE 
+xenon-lua
+xenon-std
+)
