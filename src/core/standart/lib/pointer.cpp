@@ -1,4 +1,3 @@
-#include <cstddef>
 extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
