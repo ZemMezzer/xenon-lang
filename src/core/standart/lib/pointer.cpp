@@ -33,8 +33,19 @@ static Pointer* check_ptr(lua_State* L, int idx) {
 }
 
 static int l_ptr_new(lua_State* L) {
-    size_t e_size = luaL_checkinteger(L, 1);
-    size_t e_count = luaL_checkinteger(L, 2);
+
+    size_t args_size = lua_gettop(L);
+    size_t e_size = 0;
+    size_t e_count = 0;
+
+    if(args_size < 3) {
+        e_size = 1;
+        e_count = luaL_checkinteger(L, 1);
+    }
+    else{
+        e_size = luaL_checkinteger(L, 1);
+        e_count = luaL_checkinteger(L, 2);
+    }
 
     Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
     p->alloc(e_size, e_count);
