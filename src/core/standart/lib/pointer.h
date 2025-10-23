@@ -1,19 +1,21 @@
+#include <cstddef>
 #include <stdint.h>
 extern "C" {
 #include "lua.h"
 }
 
-struct Pointer {
+class Pointer {
+private:
     uint8_t* address;
-    bool is_owned;
-
-    size_t element_size;
-    size_t elements_count;
-
     size_t size;
+    Pointer* parent;
 
-    void alloc(size_t e_size, size_t e_count);
-    void set(uint8_t* pointer_address, size_t e_size, size_t e_count, bool owned);
+public:
+    void alloc(size_t size);
+    void set(uint8_t* pointer_address, size_t size, Pointer* parent);
+    uint8_t* get_address();
+    size_t get_size();
+    bool is_owned();
     void free_pointer();
 };
 

@@ -8,26 +8,49 @@ extern "C" {
 #include <cstring>
 
 
-void Pointer::alloc(size_t e_size, size_t e_count){
-    set((uint8_t*)malloc(size), e_size, e_count, true);
+void Pointer::alloc(size_t size){
+    set((uint8_t*)malloc(size), size, nullptr);
 }
 
-void Pointer::set(uint8_t* pointer_address, size_t e_size, size_t e_count, bool owned){
+void Pointer::set(uint8_t* address, size_t size, Pointer* parent){    
+    this->size = size;
+    this->parent = parent;
 
-    element_size = e_size;
-    elements_count = e_count;
-
-    size = e_size * e_count;
-    address = pointer_address;
-    is_owned = owned;
+    if (!parent) {
+        this->address = address;
+    } else {
+        this->address = nullptr;
+    }
 }
 
 void Pointer::free_pointer() {
     free(address);
     address = nullptr;
+    size = 0;
+}
+
+uint8_t* Pointer::get_address(){
+    if(parent){
+        return parent->get_address();
+    }
+    else {
+        return address;
+    }
+}
+
+size_t Pointer::get_size() {
+    return size;
+}
+
+bool Pointer::is_owned() {
+    return parent == nullptr;
 }
 
 static const char* type_name = "Pointer";
+
+static const char* nil_ptr_exception_message = "Attempt to access nil pointer";
+static const char* non_owned_ptr_free_exception_message = "Attempt to free non-owned pointer";
+static const char* mem_access_out_of_bounds_exception_message = "Memory access out of bounds";
 
 static Pointer* check_ptr(lua_State* L, int idx) {
     return (Pointer*)luaL_checkudata(L, idx, type_name);
@@ -38,21 +61,11 @@ static int l_ptr_new(lua_State* L) {
     int top_index = get_function_arg_top_index(L);
 
     size_t args_size = lua_gettop(L) - top_index;
-    size_t e_size = 0;
-    size_t e_count = 0;
-
-    if(args_size < 2) {
-        e_size = 1;
-        e_count = luaL_checkinteger(L, top_index);
-    }
-    else{
-        e_size = luaL_checkinteger(L, top_index);
-        e_count = luaL_checkinteger(L, top_index + 1);
-    }
+    size_t size = luaL_checkinteger(L, top_index);
 
     Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
 
-    p->alloc(e_size, e_count);
+    p->alloc(size);
     luaL_getmetatable(L, type_name);
 
     lua_setmetatable(L, -2);
@@ -63,7 +76,7 @@ static int l_ptr_new(lua_State* L) {
 static int l_ptr_from(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
     Pointer* np = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
-    np->set(p->address, p->element_size, p->elements_count, false);
+    np->set(nullptr, p->get_size(), p);
 
     luaL_getmetatable(L, type_name);
     lua_setmetatable(L, -2);
@@ -72,67 +85,70 @@ static int l_ptr_from(lua_State* L) {
 
 static int l_ptr_free(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
-    if (p->is_owned && p->address) {
+    if (p->is_owned() && p->get_address()) {
         p->free_pointer();
+
+        return 0;
     }
+
+    if(!p->get_address()){
+        return 0;
+    }
+    
+    if(!p->is_owned()) {
+        return luaL_error(L, non_owned_ptr_free_exception_message);
+    }
+
     return 0;
 }
 
 static int l_ptr_getbyte(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
+
+    if(!p->get_address()){
+        luaL_error(L, nil_ptr_exception_message);
+        return 0;
+    }
+
     size_t offset = luaL_checkinteger(L, 2);
-    lua_pushinteger(L, p->address[offset]);
+
+    if (offset >= p->get_size()) {
+        return luaL_error(L, mem_access_out_of_bounds_exception_message);
+    }
+
+    lua_pushinteger(L, p->get_address()[offset]);
     return 1;
 }
 
 static int l_ptr_setbyte(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
+
+    if(!p->get_address()){
+        luaL_error(L, nil_ptr_exception_message);
+        return 0;
+    }
+
     size_t offset = luaL_checkinteger(L, 2);
+
+    if (offset >= p->get_size()) {
+        return luaL_error(L, mem_access_out_of_bounds_exception_message);
+    }
+
     uint8_t val = luaL_checkinteger(L, 3);
-    p->address[offset] = val;
+    p->get_address()[offset] = val;
     return 0;
 }
 
 static int l_ptr_getsize(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
-    lua_pushinteger(L, p->size);
+    lua_pushinteger(L, p->get_size());
     return 1;
-}
-
-static int l_ptr_get(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
-    size_t index = luaL_checkinteger(L, 2);
-
-    if (index >= p->elements_count) {
-        return luaL_error(L, "BAD_ACCESS");
-    }
-
-    lua_Integer val = 0;
-    std::memcpy(&val, p->address + index * p->element_size, p->element_size);
-
-    lua_pushinteger(L, val);
-    return 1;
-}
-
-static int l_ptr_set(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
-    size_t index = luaL_checkinteger(L, 2);
-    int val = luaL_checkinteger(L, 3);
-
-    if (index >= p->elements_count) {
-        return luaL_error(L, "BAD_ACCESS");
-    }
-
-    std::memcpy(p->address + index * p->element_size, &val, p->element_size);
-    return 0;
 }
 
 static const luaL_Reg ptr_methods[] = {
     {"free", l_ptr_free},
     {"get_byte", l_ptr_getbyte},
     {"set_byte", l_ptr_setbyte},
-    {"get", l_ptr_get},
-    {"set", l_ptr_set},
     {"get_size", l_ptr_getsize},
     {NULL, NULL}
 };
