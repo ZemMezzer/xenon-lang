@@ -1,5 +1,4 @@
-#include <cstddef>
-#include <cstdint>
+#include <stdint.h>
 extern "C" {
 #include "lua.h"
 }

@@ -2,9 +2,11 @@ extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
 }
-#include <cstdlib>
-#include <cstring>
 #include "pointer.h"
+#include "stack_helper.h"
+#include <stdlib.h>
+#include <cstring>
+
 
 void Pointer::alloc(size_t e_size, size_t e_count){
     set((uint8_t*)malloc(size), e_size, e_count, true);
@@ -33,23 +35,28 @@ static Pointer* check_ptr(lua_State* L, int idx) {
 
 static int l_ptr_new(lua_State* L) {
 
-    size_t args_size = lua_gettop(L);
+    int top_index = get_function_arg_top_index(L);
+
+    size_t args_size = lua_gettop(L) - top_index;
     size_t e_size = 0;
     size_t e_count = 0;
 
-    if(args_size < 3) {
+    if(args_size < 2) {
         e_size = 1;
-        e_count = luaL_checkinteger(L, 1);
+        e_count = luaL_checkinteger(L, top_index);
     }
     else{
-        e_size = luaL_checkinteger(L, 1);
-        e_count = luaL_checkinteger(L, 2);
+        e_size = luaL_checkinteger(L, top_index);
+        e_count = luaL_checkinteger(L, top_index + 1);
     }
 
     Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
+
     p->alloc(e_size, e_count);
     luaL_getmetatable(L, type_name);
+
     lua_setmetatable(L, -2);
+
     return 1;
 }
 
@@ -145,5 +152,7 @@ extern "C" int luaopen_ptr(lua_State* L) {
     luaL_setfuncs(L, ptr_methods, 0);
 
     luaL_newlib(L, ptr_lib);
-    return 1;
+    lua_setglobal(L, "ptr");
+
+    return 0;
 }
