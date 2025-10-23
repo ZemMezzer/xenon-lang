@@ -1,0 +1,9 @@
+project(xenon-lua)
+
+file(GLOB_RECURSE LUA_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.c
+)
+
+add_library(${PROJECT_NAME} STATIC ${LUA_SOURCES})
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
