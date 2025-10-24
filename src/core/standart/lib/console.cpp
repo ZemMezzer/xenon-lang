@@ -5,7 +5,7 @@ extern "C" {
     #include "lua.h"
 }
 
-static const char* type_name = "Console";
+static const char* lib_name = "Console";
 
 static int l_console_readln(lua_State* L) {
     std::string input;
@@ -87,10 +87,7 @@ static const luaL_Reg console_lib[] = {
 };
 
 extern "C" int luaopen_console(lua_State* L) {
-    luaL_newmetatable(L, type_name);
-
-    lua_pushvalue(L, -1);
-    lua_setfield(L, -2, "__index");
+    luaL_newmetatable(L, lib_name);
 
     luaL_newlib(L, console_lib);
     lua_setglobal(L, "console");

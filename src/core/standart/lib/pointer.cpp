@@ -46,14 +46,14 @@ bool Pointer::is_owned() {
     return parent == nullptr;
 }
 
-static const char* type_name = "Pointer";
+static const char* lib_name = "Pointer";
 
 static const char* nil_ptr_exception_message = "Attempt to access nil pointer";
 static const char* non_owned_ptr_free_exception_message = "Attempt to free non-owned pointer";
 static const char* mem_access_out_of_bounds_exception_message = "Memory access out of bounds";
 
 static Pointer* check_ptr(lua_State* L, int idx) {
-    return (Pointer*)luaL_checkudata(L, idx, type_name);
+    return (Pointer*)luaL_checkudata(L, idx, lib_name);
 }
 
 static int l_ptr_new(lua_State* L) {
@@ -66,7 +66,7 @@ static int l_ptr_new(lua_State* L) {
     Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
 
     p->alloc(size);
-    luaL_getmetatable(L, type_name);
+    luaL_getmetatable(L, lib_name);
 
     lua_setmetatable(L, -2);
 
@@ -74,11 +74,14 @@ static int l_ptr_new(lua_State* L) {
 }
 
 static int l_ptr_from(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
+
+    int top_index = get_function_arg_top_index(L);
+
+    Pointer* p = check_ptr(L, top_index);
     Pointer* np = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
     np->set(nullptr, p->get_size(), p);
 
-    luaL_getmetatable(L, type_name);
+    luaL_getmetatable(L, lib_name);
     lua_setmetatable(L, -2);
     return 1;
 }
@@ -160,7 +163,7 @@ static const luaL_Reg ptr_lib[] = {
 };
 
 extern "C" int luaopen_ptr(lua_State* L) {
-    luaL_newmetatable(L, type_name);
+    luaL_newmetatable(L, lib_name);
 
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");
