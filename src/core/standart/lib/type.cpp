@@ -1,8 +1,9 @@
 #include "type.h"
+#include "preprocessor.h"
+#include <string>
 #include <vector>
 
 extern "C" {
-#include "lua.h"
 #include "lauxlib.h"
 }
 
@@ -49,6 +50,7 @@ extern "C" int luaopen_types(lua_State* L) {
 
         lua_pushinteger(L, i);
         lua_setglobal(L, t.name);
+        lua_register_keyword(t.name, std::to_string(t.size));
     }
 
     lua_register_global_functions(L);

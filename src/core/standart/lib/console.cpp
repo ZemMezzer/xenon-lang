@@ -1,8 +1,8 @@
+#include "console.h"
 #include <iostream>
 #include "stack_helper.h"
 extern "C" {
     #include "lauxlib.h"
-    #include "lua.h"
 }
 
 static const char* lib_name = "Console";

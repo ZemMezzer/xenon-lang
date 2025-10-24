@@ -1,12 +1,11 @@
-extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-}
 #include "pointer.h"
 #include "stack_helper.h"
 #include <stdlib.h>
 #include <cstring>
 
+extern "C" {
+#include "lauxlib.h"
+}
 
 void Pointer::alloc(size_t size){
     set((uint8_t*)malloc(size), size, nullptr);

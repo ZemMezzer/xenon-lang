@@ -2,6 +2,7 @@ project(xenon-std-lib)
 
 add_library(${PROJECT_NAME} STATIC 
 internal/stack_helper.cpp
+internal/preprocessor.cpp
 type.cpp
 pointer.cpp
 console.cpp

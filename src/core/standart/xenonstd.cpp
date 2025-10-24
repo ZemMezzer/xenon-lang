@@ -1,7 +1,5 @@
 #include "xenonstd.h"
 
-#include "lua.h"
-
 #include "pointer.h"
 #include "console.h"
 #include "type.h"
