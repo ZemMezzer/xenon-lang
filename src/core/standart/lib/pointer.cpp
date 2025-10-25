@@ -89,7 +89,6 @@ static int l_ptr_free(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
     if (p->is_owned() && p->get_address()) {
         p->free_pointer();
-
         return 0;
     }
 
@@ -126,8 +125,7 @@ static int l_ptr_setbyte(lua_State* L) {
     Pointer* p = check_ptr(L, 1);
 
     if(!p->get_address()){
-        luaL_error(L, nil_ptr_exception_message);
-        return 0;
+        return luaL_error(L, nil_ptr_exception_message);;
     }
 
     size_t offset = luaL_checkinteger(L, 2);
