@@ -47,10 +47,7 @@ extern "C" int luaopen_types(lua_State* L) {
 
     for (int i = 0; i < xenon_types.size(); i++) {
         Type t = xenon_types.at(i);
-
-        lua_pushinteger(L, i);
-        lua_setglobal(L, t.name);
-        lua_register_keyword(t.name, std::to_string(t.size));
+        lua_register_keyword(t.name, std::to_string(i));
     }
 
     lua_register_global_functions(L);
