@@ -3,16 +3,9 @@
 #include "arg.h"
 #include "interpreter.h"
 
-extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-}
-
 int main(int argc, char* argv[]) {
 
     std::vector<Arg> args;
-
-    lua_State* L = luaL_newstate();
 
     for (int i = 1; i < argc; i += 2) {
 
@@ -28,13 +21,12 @@ int main(int argc, char* argv[]) {
         args.emplace_back(ar);
     }
 
-    Interpreter interpreter(L);
+    Interpreter interpreter;
 
     for (int i = 0; i < args.size(); i++) {
         const Arg& arg = args.at(i); 
-        interpreter.doArg(arg);
+        interpreter.do_arg(arg);
     }
-
-    lua_close(L);
+    
     return 0;
 }

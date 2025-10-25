@@ -5,8 +5,6 @@ extern "C" {
     #include "lauxlib.h"
 }
 
-static const char* lib_name = "Console";
-
 static int l_console_readln(lua_State* L) {
     std::string input;
     std::getline(std::cin, input);
@@ -87,8 +85,6 @@ static const luaL_Reg console_lib[] = {
 };
 
 extern "C" int luaopen_console(lua_State* L) {
-    luaL_newmetatable(L, lib_name);
-
     luaL_newlib(L, console_lib);
     lua_setglobal(L, "console");
 

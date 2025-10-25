@@ -6,6 +6,8 @@ internal/preprocessor.cpp
 type.cpp
 pointer.cpp
 console.cpp
+runtime.cpp
+filesystem.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC xenon-lua)
