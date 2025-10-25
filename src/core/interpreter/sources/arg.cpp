@@ -21,7 +21,7 @@ static bool is_non_typed_arg(const std::string& arg){
 
 bool Args::parse_args(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
-        
+
         if(is_non_typed_arg(argv[i])){
             Arg narg(argv[i], "");
             args.emplace_back(narg);
@@ -50,4 +50,13 @@ const Arg& Args::at(int index) {
 
 int Args::size() {
     return args.size();
+}
+
+bool Args::has_arg(const std::string& arg_type) {
+    for (int i = 0; i < args.size(); i++) {
+        if(args[i].get_arg_type() == arg_type){
+            return true;
+        }
+    }
+    return false;
 }

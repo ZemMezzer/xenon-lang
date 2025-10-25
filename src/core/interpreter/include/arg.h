@@ -21,4 +21,5 @@ class Args {
         bool parse_args(int argc, char* argv[]);
         int size();
         const Arg& at(int index);
+        bool has_arg(const std::string& arg_type);
 };
