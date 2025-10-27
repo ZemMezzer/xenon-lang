@@ -1,5 +1,7 @@
 #include "pointer.h"
+#include "lua.h"
 #include "stack_helper.h"
+#include "type.h"
 #include <stdlib.h>
 #include <cstring>
 
@@ -45,7 +47,7 @@ bool Pointer::is_owned() {
     return parent == nullptr;
 }
 
-static const char* lib_name = "Pointer";
+static const char* lib_name = "pointer";
 
 static const char* nil_ptr_exception_message = "Attempt to access nil pointer";
 static const char* non_owned_ptr_free_exception_message = "Attempt to free non-owned pointer";
@@ -62,7 +64,7 @@ static int l_ptr_new(lua_State* L) {
     size_t args_size = lua_gettop(L) - top_index;
     size_t size = luaL_checkinteger(L, top_index);
 
-    Pointer* p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
+    auto p = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
 
     p->alloc(size);
     luaL_getmetatable(L, lib_name);
@@ -74,10 +76,10 @@ static int l_ptr_new(lua_State* L) {
 
 static int l_ptr_from(lua_State* L) {
 
-    int top_index = get_function_arg_top_index(L);
+    auto top_index = get_function_arg_top_index(L);
 
-    Pointer* p = check_ptr(L, top_index);
-    Pointer* np = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
+    auto p = check_ptr(L, top_index);
+    auto np = (Pointer*)lua_newuserdata(L, sizeof(Pointer));
     np->set(nullptr, p->get_size(), p);
 
     luaL_getmetatable(L, lib_name);
@@ -86,7 +88,7 @@ static int l_ptr_from(lua_State* L) {
 }
 
 static int l_ptr_free(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
+    auto p = check_ptr(L, 1);
     if (p->is_owned() && p->get_address()) {
         p->free_pointer();
         return 0;
@@ -104,7 +106,7 @@ static int l_ptr_free(lua_State* L) {
 }
 
 static int l_ptr_getbyte(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
+    auto p = check_ptr(L, 1);
 
     if(!p->get_address()){
         luaL_error(L, nil_ptr_exception_message);
@@ -122,7 +124,7 @@ static int l_ptr_getbyte(lua_State* L) {
 }
 
 static int l_ptr_setbyte(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
+    auto p = check_ptr(L, 1);
 
     if(!p->get_address()){
         return luaL_error(L, nil_ptr_exception_message);;
@@ -140,7 +142,7 @@ static int l_ptr_setbyte(lua_State* L) {
 }
 
 static int l_ptr_getsize(lua_State* L) {
-    Pointer* p = check_ptr(L, 1);
+    auto p = check_ptr(L, 1);
     lua_pushinteger(L, p->get_size());
     return 1;
 }
@@ -160,6 +162,7 @@ static const luaL_Reg ptr_lib[] = {
 };
 
 extern "C" int luaopen_ptr(lua_State* L) {
+
     luaL_newmetatable(L, lib_name);
 
     lua_pushvalue(L, -1);

@@ -15,8 +15,8 @@ static int l_console_readln(lua_State* L) {
 
 static int l_console_write(lua_State* L) {
 
-    int top_index = get_function_arg_top_index(L);
-    int args_n = lua_gettop(L);
+    auto top_index = get_function_arg_top_index(L);
+    auto args_n = lua_gettop(L);
 
     for (int i = top_index; i <= args_n; i++) {
         const int type = lua_type(L, i);
@@ -30,8 +30,10 @@ static int l_console_write(lua_State* L) {
                 std::cout << lua_tonumber(L, i) << std::flush;
             break;
 
-            case LUA_TBOOLEAN:
-                std::cout << lua_toboolean(L, i) << std::flush;
+            case LUA_TBOOLEAN: {
+                const char* cresult = lua_toboolean(L, i) == 0 ? "false" : "true";
+                std::cout << cresult << std::flush;
+            }  
             break;
 
             case LUA_TNIL:

@@ -23,7 +23,7 @@ static int l_runtime_import(lua_State* L) {
 
     std::string module_name = luaL_checkstring(L, 1);
 
-    std::unordered_map<std::string, lua_CFunction>::iterator it = xenon_modules.find(module_name);
+    auto it = xenon_modules.find(module_name);
 
     if(it == xenon_modules.end()){
         std::string error_message = "Can't find module named '" + module_name + "'";
@@ -34,7 +34,7 @@ static int l_runtime_import(lua_State* L) {
 }
 
 static int l_runtime_do_file(lua_State* L) {
-    int top_index = get_function_arg_top_index(L);
+    auto top_index = get_function_arg_top_index(L);
 
     if(!lua_isstring(L, top_index)){
         return luaL_error(L, invalid_arg_exception_message);
@@ -42,7 +42,7 @@ static int l_runtime_do_file(lua_State* L) {
 
     std::string file_name = luaL_checkstring(L, top_index);
 
-    int top_before = lua_gettop(L);
+    auto top_before = lua_gettop(L);
     lua_do_file(L, lua_get_home_directory() + "/" + file_name);
     return lua_gettop(L) - top_before;
 }

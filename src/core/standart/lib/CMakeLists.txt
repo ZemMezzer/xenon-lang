@@ -5,6 +5,7 @@ internal/stack_helper.cpp
 internal/preprocessor.cpp
 type.cpp
 pointer.cpp
+safe_pointer.cpp
 console.cpp
 runtime.cpp
 filesystem.cpp
