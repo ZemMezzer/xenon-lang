@@ -1,5 +1,6 @@
 #include "console.h"
 #include <iostream>
+#include <string>
 #include "stack_helper.h"
 extern "C" {
     #include "lauxlib.h"
