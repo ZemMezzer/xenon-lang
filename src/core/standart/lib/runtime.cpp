@@ -214,27 +214,75 @@ static void xenon_mark_loaded(lua_State* L, const std::string& resolvedPath, boo
 }
 
 static int l_runtime_import(lua_State* L) {
-    std::string module_name = xstring_to_std_string(L, 1);
 
-    auto it = xenon_modules.find(module_name);
+    int top_index = get_function_arg_top_index(L);
+    std::string file = xstring_to_std_string(L, top_index);
 
-    if(it == xenon_modules.end()){
-        std::string error_message = "Can't find module named '" + module_name + "'";
-        return luaL_error(L, error_message.c_str());
+    std::string full_path = xenon_resolve_path(L, file);
+
+    // save previous __exports
+    lua_getglobal(L, "__exports");
+    int prevRef = LUA_NOREF;
+    if (!lua_isnil(L, -1)) {
+        prevRef = luaL_ref(L, LUA_REGISTRYINDEX); // pops
+    }
+    else {
+        lua_pop(L, 1);
     }
 
-    return it->second(L);
+    // set new __exports for module
+    lua_newtable(L);
+    lua_setglobal(L, "__exports");
+
+    int rc = lua_do_file(L, full_path);
+    if (rc != 0) {
+        // restore __exports
+        if (prevRef != LUA_NOREF) {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
+            luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
+            lua_setglobal(L, "__exports");
+        }
+        else {
+            lua_pushnil(L);
+            lua_setglobal(L, "__exports");
+        }
+        return luaL_error(L, "Unable to process file: %s", full_path.c_str());
+    }
+
+    // push exports result
+    lua_getglobal(L, "__exports"); // -> result
+
+    // restore __exports
+    if (prevRef != LUA_NOREF) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
+        luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
+        lua_setglobal(L, "__exports");
+    }
+    else {
+        lua_pushnil(L);
+        lua_setglobal(L, "__exports");
+    }
+
+    return 1;
 }
 
-static int l_xenon_include(lua_State* L) {
-    std::string file = xstring_to_std_string(L, 1);
+static int xenon_try_include_builtin(lua_State* L, const std::string& module_name) {
+    auto it = xenon_modules.find(module_name);
+    if (it == xenon_modules.end())
+        return 0;
 
+    int rc = it->second(L);
+    if (rc > 0) lua_pop(L, rc);
+
+    return 1;
+}
+
+static int xenon_include_file(lua_State* L, const std::string& file) {
     std::string resolved = xenon_resolve_path(L, file);
 
     if (xenon_is_loading(L, resolved)) {
         return luaL_error(L, "Circular include detected: %s", resolved.c_str());
     }
-
     if (xenon_is_loaded(L, resolved)) {
         return 0;
     }
@@ -246,28 +294,20 @@ static int l_xenon_include(lua_State* L) {
     if (rc != 0) {
         return luaL_error(L, "Include failed: %s", resolved.c_str());
     }
-
     return 0;
 }
 
-static int l_runtime_do_file(lua_State* L) {
-    auto top_index = get_function_arg_top_index(L);
+static int l_xenon_include(lua_State* L) {
+    std::string name = xstring_to_std_string(L, 1);
 
-    std::string file_name = xstring_to_std_string(L, top_index);
-    std::string full_path = lua_get_home_directory() + "/" + file_name;
-
-    auto top_before = lua_gettop(L);
-    int rc = lua_do_file(L, full_path);
-
-    if (rc != 0) {
-        return luaL_error(L, "Unable to process file");
+    if (xenon_try_include_builtin(L, name)) {
+        return 0;
     }
 
-    return lua_gettop(L) - top_before;
+    return xenon_include_file(L, name);
 }
 
 static const luaL_Reg lib[] = {
-    {"run", l_runtime_do_file},
     {NULL, NULL}
 };
 
