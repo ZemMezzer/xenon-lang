@@ -505,10 +505,10 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
         else return '/';
       }
-      case '~': {
+      case '!': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
-        else return '~';
+        if (check_next1(ls, '=')) return TK_NE;  /* '!=' */
+        else return '!';
       }
       case ':': {
         next(ls);
@@ -519,12 +519,13 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         read_string(ls, ls->current, seminfo);
         return TK_STRING;
       }
-      case '.': {  /* '.', '..', '...', or number */
+      case '.': {  /* '.', '...', or number */
         save_and_next(ls);
         if (check_next1(ls, '.')) {
           if (check_next1(ls, '.'))
             return TK_DOTS;   /* '...' */
-          else return TK_CONCAT;   /* '..' */
+          lexerror(ls, "invalid token", '.');
+          return '.';
         }
         else if (!lisdigit(ls->current)) return '.';
         else return read_numeral(ls, seminfo);

@@ -2,6 +2,7 @@
 
 #include "pointer.h"
 #include "safe_pointer.h"
+#include "xstring.h"
 
 #include "console.h"
 #include "type.h"
@@ -19,6 +20,8 @@ namespace xenon {
         void init(lua_State* L){
             luaopen_ptr(L);
             luaopen_safeptr(L);
+            luaopen_xstring(L);
+
             luaopen_console(L);
             luaopen_types(L);
             luaopen_runtime(L);

@@ -1,4 +1,6 @@
 #include "console.h"
+#include "xstring.h"
+
 #include <iostream>
 #include <string>
 #include "stack_helper.h"
@@ -16,60 +18,18 @@ static int l_console_readln(lua_State* L) {
 
 static int l_console_write(lua_State* L) {
 
-    auto top_index = get_function_arg_top_index(L);
-    auto args_n = lua_gettop(L);
+    int top = lua_gettop(L);
 
-    for (int i = top_index; i <= args_n; i++) {
-        const int type = lua_type(L, i);
+    for (int i = 1; i <= top; i++) {
 
-        switch (type) {
-            case LUA_TSTRING:
-                std::cout << lua_tostring(L, i) << std::flush;
-            break;
+        luaL_tolstring(L, i, nullptr);
+        std::cout << lua_tostring(L, -1);
+        lua_pop(L, 1);
 
-            case LUA_TNUMBER:
-                std::cout << lua_tonumber(L, i) << std::flush;
-            break;
-
-            case LUA_TBOOLEAN: {
-                const char* cresult = lua_toboolean(L, i) == 0 ? "false" : "true";
-                std::cout << cresult << std::flush;
-            }  
-            break;
-
-            case LUA_TNIL:
-                std::cout << "nil" << std::flush;
-            break;
-
-            case LUA_TTABLE:
-                std::cout << "<table>" << std::flush;
-            break;
-
-            case LUA_TFUNCTION:
-                std::cout << "<function>" << std::flush;
-            break;
-
-            case LUA_TUSERDATA:
-                std::cout << "<userdata>" << std::flush;
-            break;
-
-            case LUA_TLIGHTUSERDATA:
-                std::cout << "<lightuserdata>" << std::flush;
-            break;
-
-            case LUA_TTHREAD:
-                std::cout << "<thread>" << std::flush;
-            break;
-
-            default:
-                std::cout << "<unknown_type>" << std::flush;
-            break;
-        }
-        
-        if(i < args_n){
-            std::cout << "\t" << std::flush;
-        }
+        if (i < top)
+            std::cout << "\t";
     }
+
     return 0;
 }
 

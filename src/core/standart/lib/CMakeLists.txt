@@ -3,13 +3,14 @@ project(xenon-std-lib)
 add_library(${PROJECT_NAME} STATIC 
 internal/stack_helper.cpp
 internal/preprocessor.cpp
+internal/xerror.hpp
 type.cpp
 pointer.cpp
 safe_pointer.cpp
 console.cpp
 runtime.cpp
 filesystem.cpp
-)
+xstring.cpp)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC xenon-lua)
 
