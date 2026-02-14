@@ -150,7 +150,6 @@ static TString *str_checkname (LexState *ls) {
   return ts;
 }
 
-
 static void init_exp (expdesc *e, expkind k, int i) {
   e->f = e->t = NO_JUMP;
   e->k = k;
@@ -1988,6 +1987,31 @@ static void retstat (LexState *ls) {
   testnext(ls, ';');  /* skip optional semicolon */
 }
 
+static void includestat(LexState* ls) {
+    FuncState* fs = ls->fs;
+
+    luaX_next(ls);
+
+    if (ls->t.token != TK_STRING)
+        luaX_syntaxerror(ls, "String literal expected after 'include'");
+
+    int base = fs->freereg;
+    luaK_reserveregs(fs, 1);
+
+    TString* incname = luaS_new(ls->L, "__include");
+    int kinc = luaK_stringK(fs, incname);
+    int env = 0;
+    luaK_codeABC(fs, OP_GETTABUP, base, env, kinc);
+
+    expdesc arg;
+    codexstrliteral(ls, &arg, ls->t.seminfo.ts);
+
+    luaK_codeABC(fs, OP_CALL, base, 2, 1);
+    luaK_fixline(fs, ls->linenumber);
+
+    luaX_next(ls);  /* consume TK_STRING */
+}
+
 
 static void statement (LexState *ls) {
   int line = ls->linenumber;  /* may be needed for error messages */
@@ -2051,6 +2075,10 @@ static void statement (LexState *ls) {
       luaX_next(ls);  /* skip 'goto' */
       gotostat(ls);
       break;
+    }
+    case TK_INCLUDE: {
+        includestat(ls);
+        break;
     }
     default: {  /* stat -> func | assignment */
       exprstat(ls);
