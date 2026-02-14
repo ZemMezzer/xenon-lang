@@ -402,12 +402,6 @@ int luaK_codeABCk (FuncState *fs, OpCode o, int a, int b, int c, int k) {
   return luaK_code(fs, CREATE_ABCk(o, a, b, c, k));
 }
 
-int luaK_stringK(FuncState* fs, TString* s) {
-    TValue o;
-    setsvalue(fs->ls->L, &o, s);
-    return addk(fs, &o, &o);
-}
-
 /*
 ** Format and emit an 'iABx' instruction.
 */
@@ -574,6 +568,11 @@ static int addk (FuncState *fs, TValue *key, TValue *v) {
   return k;
 }
 
+int luaK_stringK(FuncState* fs, TString* s) {
+    TValue o;
+    setsvalue(fs->ls->L, &o, s);
+    return addk(fs, &o, &o);
+}
 
 /*
 ** Add a string to list of constants and return its index.

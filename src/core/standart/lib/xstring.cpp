@@ -3,6 +3,7 @@
 #include "stack_helper.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 
 extern "C" {
 #include "lauxlib.h"
