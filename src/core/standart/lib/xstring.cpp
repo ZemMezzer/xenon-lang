@@ -59,6 +59,57 @@ static int l_to_string(lua_State* L) {
 	return 1;
 }
 
+static int l_join(lua_State* L) {
+	XString* delim = (XString*)luaL_checkudata(L, 1, lib_name);
+	luaL_checktype(L, 2, LUA_TTABLE);
+
+	size_t delimLen = delim->length;
+
+	lua_Integer n = luaL_len(L, 2);
+	size_t totalLen = 0;
+
+	for (lua_Integer i = 1; i <= n; ++i) {
+		lua_rawgeti(L, 2, i);
+		XString* part = (XString*)luaL_checkudata(L, -1, lib_name);
+		totalLen += part->length;
+		lua_pop(L, 1);
+	}
+
+	if (n > 1 && delimLen > 0) {
+		if ((size_t)(n - 1) > (SIZE_MAX - totalLen) / delimLen)
+			return luaL_error(L, string_too_large_message);
+		totalLen += (size_t)(n - 1) * delimLen;
+	}
+
+	XString* out = (XString*)lua_newuserdata(L, sizeof(XString) + totalLen + 1);
+	out->length = totalLen;
+	out->string = (char*)(out + 1);
+
+	char* dst = out->string;
+
+	for (lua_Integer i = 1; i <= n; ++i) {
+		lua_rawgeti(L, 2, i);
+		XString* part = (XString*)luaL_checkudata(L, -1, lib_name);
+
+		memcpy(dst, part->string, part->length);
+		dst += part->length;
+
+		lua_pop(L, 1);
+
+		if (i < n && delimLen > 0) {
+			memcpy(dst, delim->string, delimLen);
+			dst += delimLen;
+		}
+	}
+
+	out->string[totalLen] = '\0';
+
+	luaL_getmetatable(L, lib_name);
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
 static int to_string(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	lua_pushlstring(L, xs->string, xs->length);
@@ -445,6 +496,12 @@ static int split(lua_State* L) {
 	return 1;
 }
 
+static int is_empty(lua_State* L) {
+	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
+	lua_pushboolean(L, xs->length == 0);
+	return 1;
+}
+
 static int add(lua_State* L) {
 	XString* a = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* b = (XString*)luaL_checkudata(L, 2, lib_name);
@@ -543,7 +600,19 @@ static void create_methods(lua_State* L) {
 	lua_pushcfunction(L, split);
 	lua_setfield(L, -2, "split");
 
+	lua_pushcfunction(L, is_empty);
+	lua_setfield(L, -2, "is_empty");
+
 	lua_setfield(L, -2, "__methods");
+}
+
+static void create_lib(lua_State* L) {
+	lua_newtable(L);
+
+	lua_pushcfunction(L, l_join);
+	lua_setfield(L, -2, "join");
+
+	lua_setglobal(L, lib_name);
 }
 
 extern "C" int luaopen_xstring(lua_State* L) {
@@ -570,6 +639,8 @@ extern "C" int luaopen_xstring(lua_State* L) {
 		lua_setfield(L, -2, "__index");
 	}
 	lua_pop(L, 1);
+
+	create_lib(L);
 
 	lua_pushcfunction(L, l_xstr);
 	lua_setglobal(L, "_xstr");
