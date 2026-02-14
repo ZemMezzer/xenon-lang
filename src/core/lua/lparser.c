@@ -2252,8 +2252,12 @@ static void statement (LexState *ls) {
       break;
     }
     case TK_LET:
-        letstat(ls);
-        return;
+        luaX_next(ls);  /* skip LOCAL */
+        if (testnext(ls, TK_FUNCTION))  /* local function? */
+            letstat(ls);
+        else
+            letstat(ls);
+        break;
     case TK_EXPORT:
         exportstat(ls);
         return;
