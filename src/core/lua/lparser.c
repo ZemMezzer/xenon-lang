@@ -1952,6 +1952,55 @@ static void letstat(LexState* ls) {
     checktoclose(fs, toclose);
 }
 
+static void exportfuncstat(LexState* ls) {
+    FuncState* fs = ls->fs;
+
+    luaX_next(ls);  /* skip 'function' */
+
+    TString* fname = str_checkname(ls);
+
+    int vidx = new_localvar(ls, fname);
+    adjustlocalvars(ls, 1);
+
+    Vardesc* vd = getlocalvardesc(fs, vidx);
+
+    expdesc v;
+    v.f = v.t = NO_JUMP;
+    v.k = VLOCAL;
+    v.u.var.ridx = vd->vd.ridx;
+
+    expdesc b;
+    body(ls, &b, 0, ls->linenumber);
+
+    /* fname = <closure> */
+    luaK_storevar(fs, &v, &b);
+
+    int exreg = fs->freereg;
+    luaK_reserveregs(fs, 1);
+
+    TString* exportsName = luaS_newliteral(ls->L, "__exports");
+    int exkey = luaK_stringK(fs, exportsName);
+    luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
+
+    expdesc vv;
+    vv.f = vv.t = NO_JUMP;
+    vv.k = VLOCAL;
+    vv.u.var.ridx = vd->vd.ridx;
+
+    int vreg = luaK_exp2anyreg(fs, &vv);
+
+    /* key string -> register */
+    int kreg = fs->freereg;
+    luaK_reserveregs(fs, 1);
+
+    int kk = luaK_stringK(fs, fname);
+    luaK_codeABx(fs, OP_LOADK, kreg, kk);
+
+    luaK_codeABC(fs, OP_SETTABLE, exreg, kreg, vreg);
+
+    fs->freereg = exreg;
+}
+
 static void exportstat(LexState* ls) {
     /* stat -> EXPORT NAME ATTRIB { ',' NAME ATTRIB } ['=' explist] */
     FuncState* fs = ls->fs;
@@ -1965,6 +2014,11 @@ static void exportstat(LexState* ls) {
     lua_State* L = ls->L;
 
     luaX_next(ls);
+
+    if (ls->t.token == TK_FUNCTION) {
+        exportfuncstat(ls);
+        return;
+    }
 
     do {
         int vidx, kind;
