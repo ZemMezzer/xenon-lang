@@ -1964,17 +1964,12 @@ static void exportstat(LexState* ls) {
     int sizevidx = 0;
     lua_State* L = ls->L;
 
-    luaX_next(ls);  /* skip 'export' */
-
-    if (fs->export_ridx == NO_REG) {
-        luaX_syntaxerror(ls, "'export' is not available in this scope (no __exports)");
-    }
+    luaX_next(ls);
 
     do {
         int vidx, kind;
         Vardesc* vd;
 
-        /* grow vector (Lua-style) */
         luaM_growvector(L, vidxs, nvars, sizevidx, int, MAX_INT, "export variables");
 
         vidx = new_localvar(ls, str_checkname(ls));
@@ -1993,6 +1988,7 @@ static void exportstat(LexState* ls) {
         nvars++;
     } while (testnext(ls, ','));
 
+    /* parse RHS */
     if (testnext(ls, '='))
         nexps = explist(ls, &e);
     else {
@@ -2000,6 +1996,7 @@ static void exportstat(LexState* ls) {
         nexps = 0;
     }
 
+    /* assign to locals */
     {
         Vardesc* last = getlocalvardesc(fs, vidxs[nvars - 1]);
         if (nvars == nexps &&
@@ -2017,38 +2014,42 @@ static void exportstat(LexState* ls) {
 
     checktoclose(fs, toclose);
 
+    /* exreg = _ENV["__exports"] */
+    int exreg = fs->freereg;
+    luaK_reserveregs(fs, 1);
+
+    TString* exportsName = luaS_newliteral(ls->L, "__exports");
+    int exkey = luaK_stringK(fs, exportsName);
+
+    luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
+
     for (int i = 0; i < nvars; i++) {
         Vardesc* vd = getlocalvardesc(fs, vidxs[i]);
-
         TString* name = vd->vd.name;
 
-        int local_ridx = vd->vd.ridx;
-
-        expdesc t, k, v;
-
-        /* t = __exports (VLOCAL) */
-        t.f = t.t = NO_JUMP;
-        t.k = VLOCAL;
-        t.u.var.ridx = fs->export_ridx;
-
-        /* k = "name" (VKSTR) */
-        k.f = k.t = NO_JUMP;
-        k.k = VKSTR;
-        k.u.info = luaK_stringK(fs, name);
-
-        /* v = local var (VLOCAL) */
+        /* value reg */
+        expdesc v;
         v.f = v.t = NO_JUMP;
         v.k = VLOCAL;
-        v.u.var.ridx = local_ridx;
+        v.u.var.ridx = vd->vd.ridx;
 
-        luaK_exp2anyreg(fs, &v);
-        luaK_indexed(fs, &t, &k);
-        luaK_storevar(fs, &t, &v);
+        int vreg = luaK_exp2anyreg(fs, &v);
+
+        /* key string -> register */
+        int kreg = fs->freereg;
+        luaK_reserveregs(fs, 1);
+
+        int kk = luaK_stringK(fs, name);
+        luaK_codeABx(fs, OP_LOADK, kreg, kk);
+        luaK_codeABC(fs, OP_SETTABLE, exreg, kreg, vreg);
+
+        fs->freereg = kreg;
     }
+
+    fs->freereg = exreg;
 
     luaM_freearray(L, vidxs, sizevidx);
 }
-
 
 static int funcname (LexState *ls, expdesc *v) {
   /* funcname -> NAME {fieldsel} [':' NAME] */
@@ -2243,32 +2244,42 @@ static void statement (LexState *ls) {
 ** compiles the main function, which is a regular vararg function with an
 ** upvalue named LUA_ENV
 */
-static void mainfunc (LexState *ls, FuncState *fs) {
-  BlockCnt bl;
-  Upvaldesc *env;
-  open_func(ls, fs, &bl);
+static void mainfunc(LexState* ls, FuncState* fs) {
+    BlockCnt bl;
+    Upvaldesc* env;
 
-  int vidx = new_localvarliteral(ls, "__exports");
-  adjustlocalvars(ls, 1);
-  int ridx = fs->freereg;
-  luaK_reserveregs(fs, 1);
-  fs->export_ridx = (lu_byte)ridx;
-  luaK_codeABC(fs, OP_NEWTABLE, ridx, 0, 0);
+    open_func(ls, fs, &bl);
+    setvararg(fs, 0);
 
-  setvararg(fs, 0);  /* main function is always declared vararg */
-  env = allocupvalue(fs);  /* ...set environment upvalue */
-  env->instack = 1;
-  env->idx = 0;
-  env->kind = VDKREG;
-  env->name = ls->envn;
-  luaC_objbarrier(ls->L, fs->f, env->name);
-  luaX_next(ls);  /* read first token */
-  statlist(ls);  /* parse main body */
-  check(ls, TK_EOS);
+    env = allocupvalue(fs);
+    env->instack = 1;
+    env->idx = 0;
+    env->kind = VDKREG;
+    env->name = ls->envn;
+    luaC_objbarrier(ls->L, fs->f, env->name);
 
-  luaK_ret(fs, fs->export_ridx, 1);
+    luaX_next(ls);
 
-  close_func(ls);
+    /* k for "__exports" */
+    int kexports = luaK_stringK(fs, luaS_newliteral(ls->L, "__exports"));
+
+    /* _ENV["__exports"] = {} */
+    int t = fs->freereg;
+    luaK_reserveregs(fs, 1);
+    luaK_codeABC(fs, OP_NEWTABLE, t, 0, 0);
+    luaK_codeABC(fs, OP_SETTABUP, 0, kexports, t);
+    fs->freereg = t;  /* free 1 reg */
+
+    statlist(ls);
+    check(ls, TK_EOS);
+
+    /* return _ENV["__exports"] */
+    int r = fs->freereg;
+    luaK_reserveregs(fs, 1);
+    luaK_codeABx(fs, OP_GETTABUP, r, 0, kexports);
+    luaK_ret(fs, r, 1);
+
+    close_func(ls);
 }
 
 
