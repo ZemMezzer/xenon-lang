@@ -155,11 +155,26 @@ static void init_exp (expdesc *e, expkind k, int i) {
   e->u.info = i;
 }
 
+static void codexstrliteral(LexState* ls, expdesc* v, TString* lit) {
+    FuncState* fs = ls->fs;
+    int base = fs->freereg;
+    luaK_reserveregs(fs, 2);
+    TString* name = luaS_newliteral(ls->L, "_xstr");
+    int kname = luaK_stringK(fs, name);
+    int env = 0;
+    luaK_codeABC(fs, OP_GETTABUP, base, env, kname);
+    int klit = luaK_stringK(fs, lit);
+    luaK_codeABx(fs, OP_LOADK, base + 1, klit);
+    luaK_codeABC(fs, OP_CALL, base, 2, 2);
+    luaK_fixline(fs, ls->linenumber);
+    init_exp(v, VNONRELOC, base);
+    fs->freereg = base + 1;
+}
 
-static void codestring (expdesc *e, TString *s) {
-  e->f = e->t = NO_JUMP;
-  e->k = VKSTR;
-  e->u.strval = s;
+static void codestring(expdesc* e, TString* s) {
+    e->f = e->t = NO_JUMP;
+    e->k = VKSTR;
+    e->u.strval = s;
 }
 
 
@@ -1026,6 +1041,7 @@ static void funcargs (LexState *ls, expdesc *f) {
   expdesc args;
   int base, nparams;
   int line = ls->linenumber;
+  args.k = VVOID;
   switch (ls->t.token) {
     case '(': {  /* funcargs -> '(' [ explist ] ')' */
       luaX_next(ls);
@@ -1037,15 +1053,6 @@ static void funcargs (LexState *ls, expdesc *f) {
           luaK_setmultret(fs, &args);
       }
       check_match(ls, ')', '(', line);
-      break;
-    }
-    case '{': {  /* funcargs -> constructor */
-      constructor(ls, &args);
-      break;
-    }
-    case TK_STRING: {  /* funcargs -> STRING */
-      codestring(&args, ls->t.seminfo.ts);
-      luaX_next(ls);  /* must use 'seminfo' before 'next' */
       break;
     }
     default: {
@@ -1151,7 +1158,7 @@ static void simpleexp (LexState *ls, expdesc *v) {
       break;
     }
     case TK_STRING: {
-      codestring(v, ls->t.seminfo.ts);
+      codexstrliteral(ls, v, ls->t.seminfo.ts);
       break;
     }
     case TK_NIL: {
@@ -1195,7 +1202,7 @@ static UnOpr getunopr (int op) {
   switch (op) {
     case TK_NOT: return OPR_NOT;
     case '-': return OPR_MINUS;
-    case '~': return OPR_BNOT;
+    case '!': return OPR_BNOT;
     case '#': return OPR_LEN;
     default: return OPR_NOUNOPR;
   }
@@ -1213,7 +1220,7 @@ static BinOpr getbinopr (int op) {
     case TK_IDIV: return OPR_IDIV;
     case '&': return OPR_BAND;
     case '|': return OPR_BOR;
-    case '~': return OPR_BXOR;
+    case '!': return OPR_BXOR;
     case TK_SHL: return OPR_SHL;
     case TK_SHR: return OPR_SHR;
     case TK_CONCAT: return OPR_CONCAT;
@@ -1241,11 +1248,11 @@ static const struct {
    {11, 11}, {11, 11},           /* '*' '%' */
    {14, 13},                  /* '^' (right associative) */
    {11, 11}, {11, 11},           /* '/' '//' */
-   {6, 6}, {4, 4}, {5, 5},   /* '&' '|' '~' */
+   {6, 6}, {4, 4}, {5, 5},   /* '&' '|' '!' */
    {7, 7}, {7, 7},           /* '<<' '>>' */
    {9, 8},                   /* '..' (right associative) */
    {3, 3}, {3, 3}, {3, 3},   /* ==, <, <= */
-   {3, 3}, {3, 3}, {3, 3},   /* ~=, >, >= */
+   {3, 3}, {3, 3}, {3, 3},   /* !=, >, >= */
    {2, 2}, {1, 1}            /* and, or */
 };
 

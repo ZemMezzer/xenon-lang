@@ -9,7 +9,7 @@ safe_pointer.cpp
 console.cpp
 runtime.cpp
 filesystem.cpp
-)
+xstring.cpp)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC xenon-lua)
 
