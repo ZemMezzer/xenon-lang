@@ -6,7 +6,7 @@ extern "C" {
 
 struct XString {
 	char* string;
-	int length;
+	size_t length;
 };
 
 extern "C" int luaopen_xstring(lua_State* L);
