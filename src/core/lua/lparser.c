@@ -765,6 +765,7 @@ static void open_func (LexState *ls, FuncState *fs, BlockCnt *bl) {
   fs->needclose = 0;
   fs->firstlocal = ls->dyd->actvar.n;
   fs->firstlabel = ls->dyd->label.n;
+  fs->export_ridx = NO_REG;
   fs->bl = NULL;
   f->source = ls->source;
   luaC_objbarrier(ls->L, f, f->source);
@@ -1911,6 +1912,144 @@ static void localstat (LexState *ls) {
   checktoclose(fs, toclose);
 }
 
+static void letstat(LexState* ls) {
+    /* stat -> LOCAL NAME ATTRIB { ',' NAME ATTRIB } ['=' explist] */
+    FuncState* fs = ls->fs;
+    int toclose = -1;  /* index of to-be-closed variable (if any) */
+    Vardesc* var;  /* last variable */
+    int vidx, kind;  /* index and kind of last variable */
+    int nvars = 0;
+    int nexps;
+    expdesc e;
+    do {
+        vidx = new_localvar(ls, str_checkname(ls));
+        kind = getlocalattribute(ls);
+        getlocalvardesc(fs, vidx)->vd.kind = kind;
+        if (kind == RDKTOCLOSE) {  /* to-be-closed? */
+            if (toclose != -1)  /* one already present? */
+                luaK_semerror(ls, "multiple to-be-closed variables in local list");
+            toclose = fs->nactvar + nvars;
+        }
+        nvars++;
+    } while (testnext(ls, ','));
+    if (testnext(ls, '='))
+        nexps = explist(ls, &e);
+    else {
+        e.k = VVOID;
+        nexps = 0;
+    }
+    var = getlocalvardesc(fs, vidx);  /* get last variable */
+    if (nvars == nexps &&  /* no adjustments? */
+        var->vd.kind == RDKCONST &&  /* last variable is const? */
+        luaK_exp2const(fs, &e, &var->k)) {  /* compile-time constant? */
+        var->vd.kind = RDKCTC;  /* variable is a compile-time constant */
+        adjustlocalvars(ls, nvars - 1);  /* exclude last variable */
+        fs->nactvar++;  /* but count it */
+    }
+    else {
+        adjust_assign(ls, nvars, nexps, &e);
+        adjustlocalvars(ls, nvars);
+    }
+    checktoclose(fs, toclose);
+}
+
+static void exportstat(LexState* ls) {
+    /* stat -> EXPORT NAME ATTRIB { ',' NAME ATTRIB } ['=' explist] */
+    FuncState* fs = ls->fs;
+    int toclose = -1;
+    int nvars = 0;
+    int nexps;
+    expdesc e;
+
+    int* vidxs = NULL;
+    int sizevidx = 0;
+    lua_State* L = ls->L;
+
+    luaX_next(ls);  /* skip 'export' */
+
+    if (fs->export_ridx == NO_REG) {
+        luaX_syntaxerror(ls, "'export' is not available in this scope (no __exports)");
+    }
+
+    do {
+        int vidx, kind;
+        Vardesc* vd;
+
+        /* grow vector (Lua-style) */
+        luaM_growvector(L, vidxs, nvars, sizevidx, int, MAX_INT, "export variables");
+
+        vidx = new_localvar(ls, str_checkname(ls));
+        kind = getlocalattribute(ls);
+
+        vd = getlocalvardesc(fs, vidx);
+        vd->vd.kind = kind;
+
+        if (kind == RDKTOCLOSE) {
+            if (toclose != -1)
+                luaK_semerror(ls, "Multiple to-be-closed variables in export list");
+            toclose = fs->nactvar + nvars;
+        }
+
+        vidxs[nvars] = vidx;
+        nvars++;
+    } while (testnext(ls, ','));
+
+    if (testnext(ls, '='))
+        nexps = explist(ls, &e);
+    else {
+        e.k = VVOID;
+        nexps = 0;
+    }
+
+    {
+        Vardesc* last = getlocalvardesc(fs, vidxs[nvars - 1]);
+        if (nvars == nexps &&
+            last->vd.kind == RDKCONST &&
+            luaK_exp2const(fs, &e, &last->k)) {
+            last->vd.kind = RDKCTC;
+            adjustlocalvars(ls, nvars - 1);
+            fs->nactvar++;
+        }
+        else {
+            adjust_assign(ls, nvars, nexps, &e);
+            adjustlocalvars(ls, nvars);
+        }
+    }
+
+    checktoclose(fs, toclose);
+
+    for (int i = 0; i < nvars; i++) {
+        Vardesc* vd = getlocalvardesc(fs, vidxs[i]);
+
+        TString* name = vd->vd.name;
+
+        int local_ridx = vd->vd.ridx;
+
+        expdesc t, k, v;
+
+        /* t = __exports (VLOCAL) */
+        t.f = t.t = NO_JUMP;
+        t.k = VLOCAL;
+        t.u.var.ridx = fs->export_ridx;
+
+        /* k = "name" (VKSTR) */
+        k.f = k.t = NO_JUMP;
+        k.k = VKSTR;
+        k.u.info = luaK_stringK(fs, name);
+
+        /* v = local var (VLOCAL) */
+        v.f = v.t = NO_JUMP;
+        v.k = VLOCAL;
+        v.u.var.ridx = local_ridx;
+
+        luaK_exp2anyreg(fs, &v);
+        luaK_indexed(fs, &t, &k);
+        luaK_storevar(fs, &t, &v);
+    }
+
+    luaM_freearray(L, vidxs, sizevidx);
+}
+
 
 static int funcname (LexState *ls, expdesc *v) {
   /* funcname -> NAME {fieldsel} [':' NAME] */
@@ -2033,6 +2172,12 @@ static void statement (LexState *ls) {
         localstat(ls);
       break;
     }
+    case TK_LET:
+        letstat(ls);
+        return;
+    case TK_EXPORT:
+        exportstat(ls);
+        return;
     case TK_DBCOLON: {  /* stat -> label */
       luaX_next(ls);  /* skip double colon */
       labelstat(ls, str_checkname(ls), line);
@@ -2074,6 +2219,14 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   BlockCnt bl;
   Upvaldesc *env;
   open_func(ls, fs, &bl);
+
+  int vidx = new_localvarliteral(ls, "__exports");
+  adjustlocalvars(ls, 1);
+  int ridx = fs->freereg;
+  luaK_reserveregs(fs, 1);
+  fs->export_ridx = (lu_byte)ridx;
+  luaK_codeABC(fs, OP_NEWTABLE, ridx, 0, 0);
+
   setvararg(fs, 0);  /* main function is always declared vararg */
   env = allocupvalue(fs);  /* ...set environment upvalue */
   env->instack = 1;
@@ -2084,6 +2237,9 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   luaX_next(ls);  /* read first token */
   statlist(ls);  /* parse main body */
   check(ls, TK_EOS);
+
+  luaK_ret(fs, fs->export_ridx, 1);
+
   close_func(ls);
 }
 
