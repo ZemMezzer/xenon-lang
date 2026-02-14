@@ -616,6 +616,14 @@ static void create_lib(lua_State* L) {
 	lua_setglobal(L, lib_name);
 }
 
+XString* xstring_check(lua_State* L, int index) {
+	return (XString*)luaL_checkudata(L, index, lib_name);
+}
+std::string xstring_to_std_string(lua_State* L, int idx) {
+	XString* xs = xstring_check(L, idx);
+	return std::string(xs->string, xs->length);
+}
+
 extern "C" int luaopen_xstring(lua_State* L) {
 
 	if (luaL_newmetatable(L, lib_name)) {
