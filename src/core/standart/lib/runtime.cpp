@@ -23,6 +23,29 @@ static const char* invalid_arg_exception_message = "Invalid argument";
 
 static std::unordered_map<std::string, lua_CFunction> xenon_modules;
 
+static void xenon_raise(lua_State* L, int code) {
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, "code");
+        bool hasCode = lua_isinteger(L, -1);
+        lua_pop(L, 1);
+
+        lua_getfield(L, -1, "message");
+        bool hasMsg = lua_isstring(L, -1);
+        lua_pop(L, 1);
+
+        if (hasCode && hasMsg) return;
+    }
+
+    const char* msg = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_createtable(L, 0, 2);
+    lua_pushinteger(L, code);
+    lua_setfield(L, -2, "code");
+    lua_pushstring(L, msg ? msg : "unknown");
+    lua_setfield(L, -2, "message");
+}
+
 static bool xenon_file_exists(const std::string& path) {
     std::ifstream f(path);
     return f.good();
@@ -225,8 +248,7 @@ static int l_runtime_import(lua_State* L) {
     // 1) load chunk
     int rc = xenon_loadfile(L, full_path.c_str());
     if (rc != LUA_OK) {
-        const char* err = lua_tostring(L, -1);
-        return luaL_error(L, "%s", err ? err : "Compile error");
+        return lua_error(L);
     }
 
     // stack: ... [chunk]
@@ -264,7 +286,7 @@ static int l_runtime_import(lua_State* L) {
     rc = xenon_pcall(L, 0, LUA_MULTRET);
     if (rc != LUA_OK) {
         luaL_unref(L, LUA_REGISTRYINDEX, envRef);
-        return luaL_error(L, "Unable to process file: %s", full_path.c_str());
+        return lua_error(L);
     }
 
     int nret = lua_gettop(L) - baseTop;
@@ -303,7 +325,7 @@ static int xenon_include_file(lua_State* L, const std::string& file) {
     int rc = xenon_do_file(L, resolved);
     xenon_mark_loaded(L, resolved, rc == 0);
 
-    if (rc != 0) {
+    if (rc != LUA_OK) {
         return lua_error(L);
     }
     return 0;
@@ -334,6 +356,45 @@ static const luaL_Reg lib[] = {
     {NULL, NULL}
 };
 
+extern "C" void xenon_throw(lua_State* L) {
+    int code = LUA_ERRRUN;
+    const char* msg = NULL;
+
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, "code");
+        if (lua_isinteger(L, -1)) code = (int)lua_tointeger(L, -1);
+        lua_pop(L, 1);
+
+        lua_getfield(L, -1, "message");
+        msg = lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+    else {
+        msg = lua_tostring(L, -1);
+    }
+
+    if (code == LUA_ERRSYNTAX) {
+        std::cerr
+            << std::endl
+            << "Xenon Exception"
+            << std::endl
+            << "  Syntax Error: "
+            << (msg ? msg : "unknown")
+            << std::endl;
+    }
+    else {
+        std::cerr
+            << std::endl
+            << "Xenon Exception"
+            << std::endl
+            << "  Uncaught Exception:"
+            << std::endl
+            << std::endl
+            << (msg ? msg : "unknown")
+            << std::endl;
+    }
+}
+
 extern "C" int luaopen_runtime(lua_State* L) {
     
     lua_pushcfunction(L, l_pack);
@@ -354,19 +415,9 @@ extern "C" int luaopen_runtime(lua_State* L) {
 extern "C" int xenon_pcall(lua_State* L, int nargs, int nresults) {
 	int status = lua_pcall(L, nargs, nresults, 0);
 
-    if(status != LUA_OK) {
-        const char* err = lua_tostring(L, -1);
-
-        std::cerr
-            << std::endl
-            << "Xenon Exception"
-            << std::endl
-            << "  Uncaught Exception:"
-            << std::endl
-            << std::endl
-            << (err ? err : "unknown")
-            << std::endl;
-	}
+    if (status != LUA_OK) {
+        xenon_raise(L, status);
+    }
 
     return status;
 }
@@ -374,8 +425,9 @@ extern "C" int xenon_pcall(lua_State* L, int nargs, int nresults) {
 extern "C" int xenon_loadfile(lua_State* L, const std::string& file_name) {
     std::ifstream file(file_name);
     if (!file.is_open()) {
-        std::cerr << "Unable to open file " << file_name << std::endl;
-        return 1;
+        lua_pushfstring(L, "Unable to open file: %s", file_name.c_str());
+		xenon_raise(L, LUA_ERRERR);
+        return LUA_ERRERR;
     }
 
     std::stringstream buffer;
@@ -384,17 +436,9 @@ extern "C" int xenon_loadfile(lua_State* L, const std::string& file_name) {
 
     int status = luaL_loadbuffer(L, processedCode.c_str(), processedCode.size(), file_name.c_str());
 
-    if (status != LUA_OK) {
-
-        const char* err = lua_tostring(L, -1);
-        std::cerr
-            << std::endl
-            << "Xenon Exception"
-            << std::endl
-            << "  Syntax Error: "
-            << (err ? err : "unknown")
-            << std::endl;
-    }
+    if(status != LUA_OK) {
+        xenon_raise(L, status);
+	}
 
     return status;
 }
@@ -407,8 +451,7 @@ extern "C" int xenon_do_file(lua_State* L, const std::string& file_name) {
         return status;
     }
 
-    status = xenon_pcall(L, 0, LUA_MULTRET);
-    return status;
+    return xenon_pcall(L, 0, LUA_MULTRET);
 }
 
 void lua_register_module(const std::string& module_name, lua_CFunction func) {

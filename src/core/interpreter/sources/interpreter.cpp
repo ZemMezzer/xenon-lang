@@ -25,7 +25,13 @@ int Interpreter::do_file(const char* file_path){
         lua_set_home_path(lua_get_directory_path(full_path));
     }
 
-    return xenon_do_file(m_state, file_path);
+	int status = xenon_do_file(m_state, file_path);
+
+    if (status != LUA_OK) {
+        xenon_throw(m_state);
+    }
+
+    return status;
 }
 
 int Interpreter::do_arg(const Arg& arg) {

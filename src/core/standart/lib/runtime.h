@@ -2,7 +2,7 @@
 extern "C" {
 #include "lua.h"
 }
-
+extern "C" void xenon_throw(lua_State* L);
 extern "C" int luaopen_runtime(lua_State* L);
 extern "C" int xenon_do_file(lua_State* L, const std::string& file_name);
 extern "C" int xenon_loadfile(lua_State* L, const std::string& file_name);
