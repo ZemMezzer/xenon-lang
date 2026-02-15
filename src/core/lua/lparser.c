@@ -985,6 +985,31 @@ static void setvararg (FuncState *fs, int nparams) {
   luaK_codeABC(fs, OP_VARARGPREP, nparams, 0, 0);
 }
 
+static int env_upvalue(LexState* ls, FuncState* fs) {
+    TString* envn = ls->envn;
+
+    int idx = searchupvalue(fs, envn);// already have _ENV?
+	if (idx >= 0) return idx; // already has _ENV upvalue, return its index
+
+    // main chunk: _ENV is in stack register 0
+    if (fs->prev == NULL) { 
+        Upvaldesc* uv = allocupvalue(fs);
+        uv->instack = 1;
+		uv->idx = 0; // register 0 is reserved for _ENV in the main chunk
+        uv->name = envn;
+        luaC_objbarrier(ls->L, fs->f, uv->name);
+        return fs->nups - 1;
+    }
+
+	int pidx = env_upvalue(ls, fs->prev); // ensure parent function has _ENV upvalue and get its index
+
+    Upvaldesc* uv = allocupvalue(fs);
+    uv->instack = 0;
+	uv->idx = pidx; // index of _ENV upvalue in parent function
+    uv->name = envn;
+    luaC_objbarrier(ls->L, fs->f, uv->name);
+    return fs->nups - 1;
+}
 
 static void parlist(LexState* ls) {
     /* parlist -> [ {NAME ','} (NAME | 'params' NAME) ] */
@@ -1003,12 +1028,12 @@ static void parlist(LexState* ls) {
                 ndecl++;
             }
             else if (ls->t.token == TK_PARAMS) {
-                luaX_next(ls);  /* skip 'params' */
+				luaX_next(ls); // skip 'params'
 
                 check_condition(ls, !hasparams, "duplicate 'params'");
                 check_condition(ls, ls->t.token == TK_NAME, "<name> expected after 'params'");
 
-                new_localvar(ls, str_checkname(ls));  /* local var that will store packed varargs */
+				new_localvar(ls, str_checkname(ls)); // local variable to store parameters
                 hasparams = 1;
                 isvararg = 1;
                 ndecl++;
@@ -1025,32 +1050,30 @@ static void parlist(LexState* ls) {
         }
     }
 
-    adjustlocalvars(ls, ndecl);
+	adjustlocalvars(ls, ndecl); // reserve registers for parameters
+	f->numparams = cast_byte(nparams); // fixed parameters count (not params)
 
-    f->numparams = cast_byte(nparams);
+	if (isvararg)
+		setvararg(fs, f->numparams); // allow vm to use vararg instructions and prepare for params handling
 
-    if (isvararg)
-        setvararg(fs, f->numparams);
-
-    luaK_reserveregs(fs, fs->nactvar);
+	luaK_reserveregs(fs, fs->nactvar); // reserve registers for parameters (fixed + paramsvar)
 
     if (hasparams) {
-        int argsreg = fs->nactvar - 1;
-        int base = fs->freereg;
-        luaK_reserveregs(fs, 2);  /* base, base+1 */
+        int envidx = env_upvalue(ls, fs);
+		int argsreg = fs->nactvar - 1; // register where 'params' variable is located (last declared local in parlist)
+		int base = fs->freereg; // first free register after parameters
+		luaK_reserveregs(fs, 2); // reserve registers for __pack and actual arguments
 
-        TString* packname = luaS_newliteral(ls->L, XENON_PACK);
-        int k = luaK_stringK(fs, packname);
+		TString* packname = luaS_newliteral(ls->L, XENON_PACK); // new literal "__pack" (used to pack vararg parameters into a table)
+		int k = luaK_stringK(fs, packname); // constant index for "__pack" in the function's constant table
 
-        luaK_codeABC(fs, OP_GETTABUP, base, 0, k);
-        luaK_codeABC(fs, OP_VARARG, base + 1, 0, 0);
-        luaK_codeABC(fs, OP_CALL, base, 0, 2);
+		luaK_codeABC(fs, OP_GETTABUP, base, envidx, k); // load __pack function from the upvalues (it will be provided by the caller)
+        luaK_codeABC(fs, OP_VARARG, base + 1, 0, 0); // load vararg parameters into base+1 and following registers
+		luaK_codeABC(fs, OP_CALL, base, 0, 2); // call __pack(base, ...), result will be in base (the table with packed varargs)
 
-        /* args = base */
-        luaK_codeABC(fs, OP_MOVE, argsreg, base, 0);
+		luaK_codeABC(fs, OP_MOVE, argsreg, base, 0); // move packed varargs table to 'params' variable
 
-        /* release temps */
-        fs->freereg = base;
+        fs->freereg = fs->nactvar; // free registers used for packing varargs (base and base+1)
     }
 }
 

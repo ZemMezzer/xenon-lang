@@ -27,7 +27,7 @@ static int l_console_write(lua_State* L) {
         lua_pop(L, 1);
 
         if (i < top)
-            std::cout << "\t";
+            std::cout << "\t" << std::flush;
     }
 
     return 0;
