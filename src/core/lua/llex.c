@@ -37,14 +37,14 @@
 
 
 /* ORDER RESERVED */
-static const char *const luaX_tokens [] = {
-    "and", "include", "break", "continue", "do", "else", "elseif",
-    "false", "for", "function", "goto", "if",
-    "in", "local", "let", "export", "nil", "not", "or",
-    "return", "true", "while",
-    "//", "...", "==", ">=", "<=", "!=",
-    "<<", ">>", "::", "<eof>",
-    "<number>", "<integer>", "<name>", "<string>"
+static const char* const luaX_tokens[] = {
+  "and", "include", "break", "continue", "do", "else", "elseif",
+  "false", "for", "function", "goto", "if",
+  "in", "local", "params", "let", "export", "nil", "not", "or",
+  "return", "true", "while",
+  "//", "==", ">=", "<=", "!=",
+  "<<", ">>", "::", "<eof>",
+  "<number>", "<integer>", "<name>", "<string>"
 };
 
 
@@ -519,16 +519,14 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         read_string(ls, ls->current, seminfo);
         return TK_STRING;
       }
-      case '.': {  /* '.', '...', or number */
-        save_and_next(ls);
-        if (check_next1(ls, '.')) {
-          if (check_next1(ls, '.'))
-            return TK_DOTS;   /* '...' */
-          lexerror(ls, "invalid token", '.');
-          return '.';
-        }
-        else if (!lisdigit(ls->current)) return '.';
-        else return read_numeral(ls, seminfo);
+      case '.': {  /* '.', or number */
+          save_and_next(ls);
+          if (check_next1(ls, '.')) {
+              lexerror(ls, "invalid token", '.');  /* blocks '..' and '...' */
+              return '.';
+          }
+          else if (!lisdigit(ls->current)) return '.';
+          else return read_numeral(ls, seminfo);
       }
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9': {

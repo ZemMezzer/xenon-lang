@@ -24,22 +24,25 @@
 #define LUA_ENV		"_ENV"
 #endif
 
+#define XENON_EXPORTS "__internal__xenon__exports"
+#define XENON_PACK "__internal__xenon__pack"
 
 /*
 * WARNING: if you change the order of this enumeration,
 * grep "ORDER RESERVED"
 */
 enum RESERVED {
-  /* terminal symbols denoted by reserved words */
-  TK_AND = FIRST_RESERVED, TK_INCLUDE, TK_BREAK, TK_CONTINUE, TK_DO,
-  TK_ELSE, TK_ELSEIF, TK_FALSE, TK_FOR, TK_FUNCTION,
-  TK_GOTO, TK_IF, TK_IN, TK_LOCAL, TK_LET, TK_EXPORT, TK_NIL, TK_NOT, TK_OR,
-  TK_RETURN, TK_TRUE, TK_WHILE,
-  /* other terminal symbols */
-  TK_IDIV, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE,
-  TK_SHL, TK_SHR,
-  TK_DBCOLON, TK_EOS,
-  TK_FLT, TK_INT, TK_NAME, TK_STRING
+    /* reserved words */
+    TK_AND = FIRST_RESERVED, TK_INCLUDE, TK_BREAK, TK_CONTINUE, TK_DO,
+    TK_ELSE, TK_ELSEIF, TK_FALSE, TK_FOR, TK_FUNCTION,
+    TK_GOTO, TK_IF, TK_IN, TK_LOCAL, TK_PARAMS, TK_LET, TK_EXPORT,
+    TK_NIL, TK_NOT, TK_OR, TK_RETURN, TK_TRUE, TK_WHILE,
+
+    /* other terminal symbols */
+    TK_IDIV, TK_EQ, TK_GE, TK_LE, TK_NE,
+    TK_SHL, TK_SHR,
+    TK_DBCOLON, TK_EOS,
+    TK_FLT, TK_INT, TK_NAME, TK_STRING
 };
 
 /* number of reserved words */

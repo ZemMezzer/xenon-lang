@@ -986,35 +986,74 @@ static void setvararg (FuncState *fs, int nparams) {
 }
 
 
-static void parlist (LexState *ls) {
-  /* parlist -> [ {NAME ','} (NAME | '...') ] */
-  FuncState *fs = ls->fs;
-  Proto *f = fs->f;
-  int nparams = 0;
-  int isvararg = 0;
-  if (ls->t.token != ')') {  /* is 'parlist' not empty? */
-    do {
-      switch (ls->t.token) {
-        case TK_NAME: {
-          new_localvar(ls, str_checkname(ls));
-          nparams++;
-          break;
+static void parlist(LexState* ls) {
+    /* parlist -> [ {NAME ','} (NAME | 'params' NAME) ] */
+    FuncState* fs = ls->fs;
+    Proto* f = fs->f;
+    int nparams = 0;      /* fixed parameters */
+    int isvararg = 0;     /* function is vararg */
+    int hasparams = 0;    /* declared 'params <name>' */
+    int ndecl = 0;        /* total declared locals in parlist (fixed + paramsvar) */
+
+    if (ls->t.token != ')') {
+        for (;;) {
+            if (ls->t.token == TK_NAME) {
+                new_localvar(ls, str_checkname(ls));
+                nparams++;
+                ndecl++;
+            }
+            else if (ls->t.token == TK_PARAMS) {
+                luaX_next(ls);  /* skip 'params' */
+
+                check_condition(ls, !hasparams, "duplicate 'params'");
+                check_condition(ls, ls->t.token == TK_NAME, "<name> expected after 'params'");
+
+                new_localvar(ls, str_checkname(ls));  /* local var that will store packed varargs */
+                hasparams = 1;
+                isvararg = 1;
+                ndecl++;
+
+                /* 'params' must be last: no comma allowed after it */
+                check_condition(ls, ls->t.token != ',', "'params' must be the last parameter");
+                break;
+            }
+            else {
+                luaX_syntaxerror(ls, "<name> or 'params <name>' expected");
+            }
+
+            if (!testnext(ls, ',')) break;
         }
-        case TK_DOTS: {
-          luaX_next(ls);
-          isvararg = 1;
-          break;
-        }
-        default: luaX_syntaxerror(ls, "<name> or '...' expected");
-      }
-    } while (!isvararg && testnext(ls, ','));
-  }
-  adjustlocalvars(ls, nparams);
-  f->numparams = cast_byte(fs->nactvar);
-  if (isvararg)
-    setvararg(fs, f->numparams);  /* declared vararg */
-  luaK_reserveregs(fs, fs->nactvar);  /* reserve registers for parameters */
+    }
+
+    adjustlocalvars(ls, ndecl);
+
+    f->numparams = cast_byte(nparams);
+
+    if (isvararg)
+        setvararg(fs, f->numparams);
+
+    luaK_reserveregs(fs, fs->nactvar);
+
+    if (hasparams) {
+        int argsreg = fs->nactvar - 1;
+        int base = fs->freereg;
+        luaK_reserveregs(fs, 2);  /* base, base+1 */
+
+        TString* packname = luaS_newliteral(ls->L, XENON_PACK);
+        int k = luaK_stringK(fs, packname);
+
+        luaK_codeABC(fs, OP_GETTABUP, base, 0, k);
+        luaK_codeABC(fs, OP_VARARG, base + 1, 0, 0);
+        luaK_codeABC(fs, OP_CALL, base, 0, 2);
+
+        /* args = base */
+        luaK_codeABC(fs, OP_MOVE, argsreg, base, 0);
+
+        /* release temps */
+        fs->freereg = base;
+    }
 }
+
 
 
 static void body (LexState *ls, expdesc *e, int ismethod, int line) {
@@ -1197,13 +1236,6 @@ static void simpleexp (LexState *ls, expdesc *v) {
     }
     case TK_FALSE: {
       init_exp(v, VFALSE, 0);
-      break;
-    }
-    case TK_DOTS: {  /* vararg */
-      FuncState *fs = ls->fs;
-      check_condition(ls, fs->f->is_vararg,
-                      "cannot use '...' outside a vararg function");
-      init_exp(v, VVARARG, luaK_codeABC(fs, OP_VARARG, 0, 0, 1));
       break;
     }
     case '{': {  /* constructor */
@@ -1977,7 +2009,7 @@ static void exportfuncstat(LexState* ls) {
     int exreg = fs->freereg;
     luaK_reserveregs(fs, 1);
 
-    TString* exportsName = luaS_newliteral(ls->L, "__exports");
+    TString* exportsName = luaS_newliteral(ls->L, XENON_EXPORTS);
     int exkey = luaK_stringK(fs, exportsName);
     luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
 
@@ -2067,11 +2099,10 @@ static void exportstat(LexState* ls) {
 
     checktoclose(fs, toclose);
 
-    /* exreg = _ENV["__exports"] */
     int exreg = fs->freereg;
     luaK_reserveregs(fs, 1);
 
-    TString* exportsName = luaS_newliteral(ls->L, "__exports");
+    TString* exportsName = luaS_newliteral(ls->L, XENON_EXPORTS);
     int exkey = luaK_stringK(fs, exportsName);
 
     luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
@@ -2317,10 +2348,8 @@ static void mainfunc(LexState* ls, FuncState* fs) {
 
     luaX_next(ls);
 
-    /* k for "__exports" */
-    int kexports = luaK_stringK(fs, luaS_newliteral(ls->L, "__exports"));
+    int kexports = luaK_stringK(fs, luaS_newliteral(ls->L, XENON_EXPORTS));
 
-    /* _ENV["__exports"] = {} */
     int t = fs->freereg;
     luaK_reserveregs(fs, 1);
     luaK_codeABC(fs, OP_NEWTABLE, t, 0, 0);
@@ -2330,10 +2359,9 @@ static void mainfunc(LexState* ls, FuncState* fs) {
     statlist(ls);
     check(ls, TK_EOS);
 
-    /* return _ENV["__exports"] */
     int r = fs->freereg;
     luaK_reserveregs(fs, 1);
-      luaK_codeABC(fs, OP_GETTABUP, r, 0, kexports);
+    luaK_codeABC(fs, OP_GETTABUP, r, 0, kexports);
     luaK_ret(fs, r, 1);
 
     close_func(ls);
