@@ -1761,8 +1761,7 @@ static void forstat (LexState *ls, int line) {
     default:
         luaX_syntaxerror(ls, "'=' or 'in' expected");
     }
-
-    /* NO: check_match(ls, TK_END, TK_FOR, line);  // end больше не нужен */
+    
     leaveblock(fs);  /* loop scope ('break' jumps to this point) */
 }
 
@@ -2334,7 +2333,7 @@ static void mainfunc(LexState* ls, FuncState* fs) {
     /* return _ENV["__exports"] */
     int r = fs->freereg;
     luaK_reserveregs(fs, 1);
-    luaK_codeABx(fs, OP_GETTABUP, r, 0, kexports);
+      luaK_codeABC(fs, OP_GETTABUP, r, 0, kexports);
     luaK_ret(fs, r, 1);
 
     close_func(ls);
