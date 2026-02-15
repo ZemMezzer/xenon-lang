@@ -1983,158 +1983,6 @@ static void letstat(LexState* ls) {
     checktoclose(fs, toclose);
 }
 
-static void exportfuncstat(LexState* ls) {
-    FuncState* fs = ls->fs;
-
-    luaX_next(ls);  /* skip 'function' */
-
-    TString* fname = str_checkname(ls);
-
-    int vidx = new_localvar(ls, fname);
-    adjustlocalvars(ls, 1);
-
-    Vardesc* vd = getlocalvardesc(fs, vidx);
-
-    expdesc v;
-    v.f = v.t = NO_JUMP;
-    v.k = VLOCAL;
-    v.u.var.ridx = vd->vd.ridx;
-
-    expdesc b;
-    body(ls, &b, 0, ls->linenumber);
-
-    /* fname = <closure> */
-    luaK_storevar(fs, &v, &b);
-
-    int exreg = fs->freereg;
-    luaK_reserveregs(fs, 1);
-
-    TString* exportsName = luaS_newliteral(ls->L, XENON_EXPORTS);
-    int exkey = luaK_stringK(fs, exportsName);
-    luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
-
-    expdesc vv;
-    vv.f = vv.t = NO_JUMP;
-    vv.k = VLOCAL;
-    vv.u.var.ridx = vd->vd.ridx;
-
-    int vreg = luaK_exp2anyreg(fs, &vv);
-
-    /* key string -> register */
-    int kreg = fs->freereg;
-    luaK_reserveregs(fs, 1);
-
-    int kk = luaK_stringK(fs, fname);
-    luaK_codeABx(fs, OP_LOADK, kreg, kk);
-
-    luaK_codeABC(fs, OP_SETTABLE, exreg, kreg, vreg);
-
-    fs->freereg = exreg;
-}
-
-static void exportstat(LexState* ls) {
-    /* stat -> EXPORT NAME ATTRIB { ',' NAME ATTRIB } ['=' explist] */
-    FuncState* fs = ls->fs;
-    int toclose = -1;
-    int nvars = 0;
-    int nexps;
-    expdesc e;
-
-    int* vidxs = NULL;
-    int sizevidx = 0;
-    lua_State* L = ls->L;
-
-    luaX_next(ls);
-
-    if (ls->t.token == TK_FUNCTION) {
-        exportfuncstat(ls);
-        return;
-    }
-
-    do {
-        int vidx, kind;
-        Vardesc* vd;
-
-        luaM_growvector(L, vidxs, nvars, sizevidx, int, MAX_INT, "export variables");
-
-        vidx = new_localvar(ls, str_checkname(ls));
-        kind = getlocalattribute(ls);
-
-        vd = getlocalvardesc(fs, vidx);
-        vd->vd.kind = kind;
-
-        if (kind == RDKTOCLOSE) {
-            if (toclose != -1)
-                luaK_semerror(ls, "Multiple to-be-closed variables in export list");
-            toclose = fs->nactvar + nvars;
-        }
-
-        vidxs[nvars] = vidx;
-        nvars++;
-    } while (testnext(ls, ','));
-
-    /* parse RHS */
-    if (testnext(ls, '='))
-        nexps = explist(ls, &e);
-    else {
-        e.k = VVOID;
-        nexps = 0;
-    }
-
-    /* assign to locals */
-    {
-        Vardesc* last = getlocalvardesc(fs, vidxs[nvars - 1]);
-        if (nvars == nexps &&
-            last->vd.kind == RDKCONST &&
-            luaK_exp2const(fs, &e, &last->k)) {
-            last->vd.kind = RDKCTC;
-            adjustlocalvars(ls, nvars - 1);
-            fs->nactvar++;
-        }
-        else {
-            adjust_assign(ls, nvars, nexps, &e);
-            adjustlocalvars(ls, nvars);
-        }
-    }
-
-    checktoclose(fs, toclose);
-
-    int exreg = fs->freereg;
-    luaK_reserveregs(fs, 1);
-
-    TString* exportsName = luaS_newliteral(ls->L, XENON_EXPORTS);
-    int exkey = luaK_stringK(fs, exportsName);
-
-    luaK_codeABC(fs, OP_GETTABUP, exreg, 0, exkey);
-
-    for (int i = 0; i < nvars; i++) {
-        Vardesc* vd = getlocalvardesc(fs, vidxs[i]);
-        TString* name = vd->vd.name;
-
-        /* value reg */
-        expdesc v;
-        v.f = v.t = NO_JUMP;
-        v.k = VLOCAL;
-        v.u.var.ridx = vd->vd.ridx;
-
-        int vreg = luaK_exp2anyreg(fs, &v);
-
-        /* key string -> register */
-        int kreg = fs->freereg;
-        luaK_reserveregs(fs, 1);
-
-        int kk = luaK_stringK(fs, name);
-        luaK_codeABx(fs, OP_LOADK, kreg, kk);
-        luaK_codeABC(fs, OP_SETTABLE, exreg, kreg, vreg);
-
-        fs->freereg = kreg;
-    }
-
-    fs->freereg = exreg;
-
-    luaM_freearray(L, vidxs, sizevidx);
-}
-
 static int funcname (LexState *ls, expdesc *v) {
   /* funcname -> NAME {fieldsel} [':' NAME] */
   int ismethod = 0;
@@ -2288,9 +2136,6 @@ static void statement (LexState *ls) {
         else
             letstat(ls);
         break;
-    case TK_EXPORT:
-        exportstat(ls);
-        return;
     case TK_DBCOLON: {  /* stat -> label */
       luaX_next(ls);  /* skip double colon */
       labelstat(ls, str_checkname(ls), line);
@@ -2335,35 +2180,17 @@ static void statement (LexState *ls) {
 static void mainfunc(LexState* ls, FuncState* fs) {
     BlockCnt bl;
     Upvaldesc* env;
-
     open_func(ls, fs, &bl);
-    setvararg(fs, 0);
-
-    env = allocupvalue(fs);
+    setvararg(fs, 0);  /* main function is always declared vararg */
+    env = allocupvalue(fs);  /* ...set environment upvalue */
     env->instack = 1;
     env->idx = 0;
     env->kind = VDKREG;
     env->name = ls->envn;
     luaC_objbarrier(ls->L, fs->f, env->name);
-
-    luaX_next(ls);
-
-    int kexports = luaK_stringK(fs, luaS_newliteral(ls->L, XENON_EXPORTS));
-
-    int t = fs->freereg;
-    luaK_reserveregs(fs, 1);
-    luaK_codeABC(fs, OP_NEWTABLE, t, 0, 0);
-    luaK_codeABC(fs, OP_SETTABUP, 0, kexports, t);
-    fs->freereg = t;  /* free 1 reg */
-
-    statlist(ls);
+    luaX_next(ls);  /* read first token */
+    statlist(ls);  /* parse main body */
     check(ls, TK_EOS);
-
-    int r = fs->freereg;
-    luaK_reserveregs(fs, 1);
-    luaK_codeABC(fs, OP_GETTABUP, r, 0, kexports);
-    luaK_ret(fs, r, 1);
-
     close_func(ls);
 }
 

@@ -24,7 +24,6 @@
 #define LUA_ENV		"_ENV"
 #endif
 
-#define XENON_EXPORTS "__internal__xenon__exports"
 #define XENON_PACK "__internal__xenon__pack"
 
 /*
@@ -35,7 +34,7 @@ enum RESERVED {
     /* reserved words */
     TK_AND = FIRST_RESERVED, TK_INCLUDE, TK_BREAK, TK_CONTINUE, TK_DO,
     TK_ELSE, TK_ELSEIF, TK_FALSE, TK_FOR, TK_FUNCTION,
-    TK_GOTO, TK_IF, TK_IN, TK_LOCAL, TK_PARAMS, TK_LET, TK_EXPORT,
+    TK_GOTO, TK_IF, TK_IN, TK_LOCAL, TK_PARAMS, TK_LET,
     TK_NIL, TK_NOT, TK_OR, TK_RETURN, TK_TRUE, TK_WHILE,
 
     /* other terminal symbols */

@@ -216,52 +216,65 @@ static void xenon_mark_loaded(lua_State* L, const std::string& resolvedPath, boo
 }
 
 static int l_runtime_import(lua_State* L) {
-
     int top_index = get_function_arg_top_index(L);
     std::string file = xstring_to_std_string(L, top_index);
-
     std::string full_path = xenon_resolve_path(L, file);
 
-    lua_getglobal(L, XENON_EXPORTS);
-    int prevRef = LUA_NOREF;
-    if (!lua_isnil(L, -1)) {
-        prevRef = luaL_ref(L, LUA_REGISTRYINDEX); // pops
-    }
-    else {
-        lua_pop(L, 1);
-    }
+    int baseTop = lua_gettop(L);
 
-    lua_newtable(L);
-    lua_setglobal(L, XENON_EXPORTS);
+    // 1) load chunk
+    int rc = xenon_loadfile(L, full_path.c_str());
+    if (rc != LUA_OK) {
+        return luaL_error(L, "Unable to load file: %s", full_path.c_str());
+    }
+    // stack: ... [chunk]
 
-    int rc = lua_do_file(L, full_path);
-    if (rc != 0) {
-        if (prevRef != LUA_NOREF) {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
-            luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
-            lua_setglobal(L, XENON_EXPORTS);
-        }
-        else {
-            lua_pushnil(L);
-            lua_setglobal(L, XENON_EXPORTS);
-        }
+    // stack: ... [chunk][env]
+    lua_newtable(L); // create env
+    
+    // stack: ... [chunk][env][mt]
+	lua_newtable(L); // create mt fallback table
+
+	// stack: ... [chunk][env][mt][_G]
+    lua_pushglobaltable(L);
+
+	// stack: ... [chunk][env][mt]
+	lua_setfield(L, -2, "__index"); // mt.__index = _G, fallback
+    
+    // stack: ... [chunk][env]
+	lua_setmetatable(L, -2); // set metatable for env; pops mt, env is still at -1
+    
+
+    // stack: ... [chunk][env][env]
+    lua_pushvalue(L, -1);
+
+    // stack: ... [chunk][env]
+	int envRef = luaL_ref(L, LUA_REGISTRYINDEX); // get reference to env and pop it; env is still at -1, but we have its ref in envRef
+
+    // stack: ... [chunk][env][env]
+    lua_pushvalue(L, -1); // push env (value for upvalue)
+
+    // stack: ... [chunk][env]
+    lua_setupvalue(L, -3, 1); // set upvalue #1 of chunk; pops pushed env
+
+    // stack: ... [chunk]
+    lua_pop(L, 1); // remove env from stack, chunk is now on top
+
+    rc = xenon_pcall(L, 0, LUA_MULTRET);
+    if (rc != LUA_OK) {
+        luaL_unref(L, LUA_REGISTRYINDEX, envRef);
         return luaL_error(L, "Unable to process file: %s", full_path.c_str());
     }
 
-    // push exports result
-    lua_getglobal(L, XENON_EXPORTS); // -> result
+    int nret = lua_gettop(L) - baseTop;
 
-    if (prevRef != LUA_NOREF) {
-        lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
-        luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
-        lua_setglobal(L, XENON_EXPORTS);
-    }
-    else {
-        lua_pushnil(L);
-        lua_setglobal(L, XENON_EXPORTS);
+    if (nret == 0) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, envRef);
+		nret = 1; // return env if no return values, to allow module to export via env table instead of return statement
     }
 
-    return 1;
+    luaL_unref(L, LUA_REGISTRYINDEX, envRef);
+	return nret; //return number of return values from chunk
 }
 
 static int xenon_try_include_builtin(lua_State* L, const std::string& module_name) {
@@ -286,7 +299,7 @@ static int xenon_include_file(lua_State* L, const std::string& file) {
     }
 
     xenon_mark_loading(L, resolved);
-    int rc = lua_do_file(L, resolved);
+    int rc = xenon_do_file(L, resolved);
     xenon_mark_loaded(L, resolved, rc == 0);
 
     if (rc != 0) {
@@ -336,19 +349,10 @@ extern "C" int luaopen_runtime(lua_State* L) {
     return 0;
 }
 
-extern "C" int lua_do_file(lua_State* L, const std::string& file_name) {
+extern "C" int xenon_pcall(lua_State* L, int nargs, int nresults) {
+	int status = lua_pcall(L, nargs, nresults, 0);
 
-    std::ifstream file(file_name);
-    if (!file.is_open()) {
-        std::cerr << "Unable to open file " << file_name << std::endl;
-        return -1;
-    }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string processedCode = lua_preprocess_code(buffer.str());
-
-    if (luaL_loadbuffer(L, processedCode.c_str(), processedCode.size(), file_name.c_str()) || lua_pcall(L, 0, LUA_MULTRET, 0)) {
+    if(status != LUA_OK) {
         const char* err = lua_tostring(L, -1);
 
         std::cerr 
@@ -360,7 +364,25 @@ extern "C" int lua_do_file(lua_State* L, const std::string& file_name) {
         << std::endl 
         << (err ? err : "unknown") 
         << std::endl;
+	}
 
+    return status;
+}
+
+extern "C" int xenon_loadfile(lua_State* L, const std::string& file_name) {
+    std::ifstream file(file_name);
+    if (!file.is_open()) {
+        std::cerr << "Unable to open file " << file_name << std::endl;
+        return 1;
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string processedCode = lua_preprocess_code(buffer.str());
+    return luaL_loadbuffer(L, processedCode.c_str(), processedCode.size(), file_name.c_str());
+}
+
+extern "C" int xenon_do_file(lua_State* L, const std::string& file_name) {
+    if (xenon_loadfile(L, file_name) || xenon_pcall(L, 0, LUA_MULTRET)) {
         lua_pop(L, 1);
         return -1;
     }
