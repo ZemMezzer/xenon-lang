@@ -27,7 +27,7 @@ static lua_Integer find_index(XString* xs, XString* sub) {
 	return 0;
 }
 
-static int l_xstr(lua_State* L) {
+static int xl_xstr(lua_State* L) {
 	
 	size_t length = 0;
 	const char* s = luaL_checklstring(L, 1, &length);
@@ -43,7 +43,7 @@ static int l_xstr(lua_State* L) {
 	return 1;
 }
 
-static int l_to_string(lua_State* L) {
+static int xl_to_string(lua_State* L) {
 	size_t len;
 	const char* s = luaL_tolstring(L, 1, &len);
 
@@ -135,7 +135,7 @@ static int equals(lua_State* L) {
 	return 1;
 }
 
-static int to_upper(lua_State* L) {
+static int xl_to_upper(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	size_t len = xs->length;
 	XString* upper_xs = (XString*)lua_newuserdata(L,sizeof(XString) + len + 1);
@@ -156,7 +156,7 @@ static int to_upper(lua_State* L) {
 	return 1;
 }
 
-static int to_lower(lua_State* L) {
+static int xl_to_lower(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	size_t len = xs->length;
 	XString* lower_xs = (XString*)lua_newuserdata(L, sizeof(XString) + len + 1);
@@ -177,7 +177,7 @@ static int to_lower(lua_State* L) {
 	return 1;
 }
 
-static int index_of(lua_State* L) {
+static int xl_index_of(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* sub = (XString*)luaL_checkudata(L, 2, lib_name);
 
@@ -193,7 +193,7 @@ static int index_of(lua_State* L) {
 	return 1;
 }
 
-static int substring(lua_State* L) {
+static int xl_substring(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 
 	lua_Integer start = luaL_checkinteger(L, 2);
@@ -230,7 +230,7 @@ static int substring(lua_State* L) {
 	return 1;
 }
 
-static int contains(lua_State* L) {
+static int xl_contains(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* sub = (XString*)luaL_checkudata(L, 2, lib_name);
 
@@ -238,7 +238,7 @@ static int contains(lua_State* L) {
 	return 1;
 }
 
-static int starts_with(lua_State* L) {
+static int xl_starts_with(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* prefix = (XString*)luaL_checkudata(L, 2, lib_name);
 	if (prefix->length > xs->length) {
@@ -250,7 +250,7 @@ static int starts_with(lua_State* L) {
 	return 1;
 }
 
-static int ends_with(lua_State* L) {
+static int xl_ends_with(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* suffix = (XString*)luaL_checkudata(L, 2, lib_name);
 	if (suffix->length > xs->length) {
@@ -263,7 +263,7 @@ static int ends_with(lua_State* L) {
 	return 1;
 }
 
-static int replace(lua_State* L) {
+static int xl_replace(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* old = (XString*)luaL_checkudata(L, 2, lib_name);
 	XString* rep = (XString*)luaL_checkudata(L, 3, lib_name);
@@ -334,7 +334,7 @@ static int replace(lua_State* L) {
 	return 1;
 }
 
-static int trim(lua_State* L) {
+static int xl_trim(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	size_t start = 0;
 	size_t end = (size_t)xs->length;
@@ -355,7 +355,7 @@ static int trim(lua_State* L) {
 	return 1;
 }
 
-static int last_index_of(lua_State* L) {
+static int xl_last_index_of(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* sub = (XString*)luaL_checkudata(L, 2, lib_name);
 
@@ -383,7 +383,7 @@ static int last_index_of(lua_State* L) {
 	return 1;
 }
 
-static int reverse(lua_State* L) {
+static int xl_reverse(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	size_t len = xs->length;
 	XString* rev_xs = (XString*)lua_newuserdata(L, sizeof(XString) + len + 1);
@@ -398,7 +398,7 @@ static int reverse(lua_State* L) {
 	return 1;
 }
 
-static int repeat(lua_State* L) {
+static int xl_repeat(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	lua_Integer n = luaL_checkinteger(L, 2);
 
@@ -441,7 +441,7 @@ static int repeat(lua_State* L) {
 	return 1;
 }
 
-static int split(lua_State* L) {
+static int xl_split(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	XString* delim = (XString*)luaL_checkudata(L, 2, lib_name);
 
@@ -497,7 +497,7 @@ static int split(lua_State* L) {
 	return 1;
 }
 
-static int is_empty(lua_State* L) {
+static int xl_is_empty(lua_State* L) {
 	XString* xs = (XString*)luaL_checkudata(L, 1, lib_name);
 	lua_pushboolean(L, xs->length == 0);
 	return 1;
@@ -562,46 +562,46 @@ static int index(lua_State* L) {
 static void create_methods(lua_State* L) {
 	lua_newtable(L);
 
-	lua_pushcfunction(L, to_upper);
+	lua_pushcfunction(L, xl_to_upper);
 	lua_setfield(L, -2, "to_upper");
 
-	lua_pushcfunction(L, to_lower);
+	lua_pushcfunction(L, xl_to_lower);
 	lua_setfield(L, -2, "to_lower");
 
-	lua_pushcfunction(L, index_of);
+	lua_pushcfunction(L, xl_index_of);
 	lua_setfield(L, -2, "index_of");
 
-	lua_pushcfunction(L, substring);
+	lua_pushcfunction(L, xl_substring);
 	lua_setfield(L, -2, "substring");
 
-	lua_pushcfunction(L, contains);
+	lua_pushcfunction(L, xl_contains);
 	lua_setfield(L, -2, "contains");
 
-	lua_pushcfunction(L, starts_with);
+	lua_pushcfunction(L, xl_starts_with);
 	lua_setfield(L, -2, "starts_with");
 
-	lua_pushcfunction(L, ends_with);
+	lua_pushcfunction(L, xl_ends_with);
 	lua_setfield(L, -2, "ends_with");
 
-	lua_pushcfunction(L, replace);
+	lua_pushcfunction(L, xl_replace);
 	lua_setfield(L, -2, "replace");
 
-	lua_pushcfunction(L, trim);
+	lua_pushcfunction(L, xl_trim);
 	lua_setfield(L, -2, "trim");
 
-	lua_pushcfunction(L, last_index_of);
+	lua_pushcfunction(L, xl_last_index_of);
 	lua_setfield(L, -2, "last_index_of");
 
-	lua_pushcfunction(L, reverse);
+	lua_pushcfunction(L, xl_reverse);
 	lua_setfield(L, -2, "reverse");
 
-	lua_pushcfunction(L, repeat);
+	lua_pushcfunction(L, xl_repeat);
 	lua_setfield(L, -2, "rep");
 
-	lua_pushcfunction(L, split);
+	lua_pushcfunction(L, xl_split);
 	lua_setfield(L, -2, "split");
 
-	lua_pushcfunction(L, is_empty);
+	lua_pushcfunction(L, xl_is_empty);
 	lua_setfield(L, -2, "is_empty");
 
 	lua_setfield(L, -2, "__methods");
@@ -624,7 +624,7 @@ std::string xstring_to_std_string(lua_State* L, int idx) {
 	return std::string(xs->string, xs->length);
 }
 
-extern "C" int luaopen_xstring(lua_State* L) {
+extern "C" int xenon_openlib_xstring(lua_State* L) {
 
 	if (luaL_newmetatable(L, lib_name)) {
 		lua_pushcfunction(L, to_string);
@@ -651,10 +651,10 @@ extern "C" int luaopen_xstring(lua_State* L) {
 
 	create_lib(L);
 
-	lua_pushcfunction(L, l_xstr);
+	lua_pushcfunction(L, xl_xstr);
 	lua_setglobal(L, "_xstr");
 
-	lua_pushcfunction(L, l_to_string);
+	lua_pushcfunction(L, xl_to_string);
 	lua_setglobal(L, "to_string");
 
 	return 0;

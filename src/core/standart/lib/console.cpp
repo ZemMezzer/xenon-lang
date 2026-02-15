@@ -8,7 +8,7 @@ extern "C" {
     #include "lauxlib.h"
 }
 
-static int l_console_readln(lua_State* L) {
+static int xl_console_readln(lua_State* L) {
     std::string input;
     std::getline(std::cin, input);
 
@@ -16,7 +16,7 @@ static int l_console_readln(lua_State* L) {
     return 1;
 }
 
-static int l_console_write(lua_State* L) {
+static int xl_console_write(lua_State* L) {
 
     int top = lua_gettop(L);
 
@@ -33,21 +33,21 @@ static int l_console_write(lua_State* L) {
     return 0;
 }
 
-static int l_console_write_line(lua_State* L) {
-    l_console_write(L);
+static int xl_console_write_line(lua_State* L) {
+    xl_console_write(L);
     std::cout << std::endl;
 
     return 0;
 }
 
 static const luaL_Reg console_lib[] = {
-    {"write", l_console_write},
-    {"writeln", l_console_write_line},
-    {"readln", l_console_readln},
+    {"write", xl_console_write},
+    {"writeln", xl_console_write_line},
+    {"readln", xl_console_readln},
     {NULL, NULL}
 };
 
-extern "C" int luaopen_console(lua_State* L) {
+extern "C" int xenon_openlib_console(lua_State* L) {
     luaL_newlib(L, console_lib);
     lua_setglobal(L, "console");
 

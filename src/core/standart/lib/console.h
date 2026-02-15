@@ -2,4 +2,4 @@ extern "C" {
 #include "lua.h"
 }
 
-extern "C" int luaopen_console(lua_State* L);
+extern "C" int xenon_openlib_console(lua_State* L);

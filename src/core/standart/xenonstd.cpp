@@ -11,14 +11,14 @@ namespace xenon {
     namespace std {
 
         static void register_modules() {
-            lua_register_module("filesystem", luaopen_filesystem);
+            xenon_register_builtin_module("filesystem", xenon_openlib_filesystem);
         }
 
         void init(lua_State* L){
-            luaopen_xstring(L);
+            xenon_openlib_xstring(L);
 
-            luaopen_console(L);
-            luaopen_runtime(L);
+            xenon_openlib_console(L);
+            xenon_openlib_runtime(L);
 
             register_modules();
         }
