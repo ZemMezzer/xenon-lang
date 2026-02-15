@@ -12,6 +12,7 @@
 
 extern "C" {
 #include "lauxlib.h"
+#include "llex.h"
 }
 
 static constexpr const char* XENON_CUR_FILE_STACK = "xenon.current_file_stack";
@@ -19,6 +20,7 @@ static constexpr const char* XENON_LOADED = "xenon.loaded";
 static constexpr const char* XENON_LOADING = "xenon.loading";
 
 static const char* invalid_arg_exception_message = "Invalid argument";
+
 static std::unordered_map<std::string, lua_CFunction> xenon_modules;
 
 static bool xenon_file_exists(const std::string& path) {
@@ -220,8 +222,7 @@ static int l_runtime_import(lua_State* L) {
 
     std::string full_path = xenon_resolve_path(L, file);
 
-    // save previous __exports
-    lua_getglobal(L, "__exports");
+    lua_getglobal(L, XENON_EXPORTS);
     int prevRef = LUA_NOREF;
     if (!lua_isnil(L, -1)) {
         prevRef = luaL_ref(L, LUA_REGISTRYINDEX); // pops
@@ -230,37 +231,34 @@ static int l_runtime_import(lua_State* L) {
         lua_pop(L, 1);
     }
 
-    // set new __exports for module
     lua_newtable(L);
-    lua_setglobal(L, "__exports");
+    lua_setglobal(L, XENON_EXPORTS);
 
     int rc = lua_do_file(L, full_path);
     if (rc != 0) {
-        // restore __exports
         if (prevRef != LUA_NOREF) {
             lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
             luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
-            lua_setglobal(L, "__exports");
+            lua_setglobal(L, XENON_EXPORTS);
         }
         else {
             lua_pushnil(L);
-            lua_setglobal(L, "__exports");
+            lua_setglobal(L, XENON_EXPORTS);
         }
         return luaL_error(L, "Unable to process file: %s", full_path.c_str());
     }
 
     // push exports result
-    lua_getglobal(L, "__exports"); // -> result
+    lua_getglobal(L, XENON_EXPORTS); // -> result
 
-    // restore __exports
     if (prevRef != LUA_NOREF) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, prevRef);
         luaL_unref(L, LUA_REGISTRYINDEX, prevRef);
-        lua_setglobal(L, "__exports");
+        lua_setglobal(L, XENON_EXPORTS);
     }
     else {
         lua_pushnil(L);
-        lua_setglobal(L, "__exports");
+        lua_setglobal(L, XENON_EXPORTS);
     }
 
     return 1;
@@ -307,12 +305,25 @@ static int l_xenon_include(lua_State* L) {
     return xenon_include_file(L, name);
 }
 
+static int l_pack(lua_State* L) {
+    int n = lua_gettop(L);
+    lua_createtable(L, n, 0);
+    for (int i = 1; i <= n; i++) {
+        lua_pushvalue(L, i);
+        lua_rawseti(L, -2, i);
+    }
+    return 1;
+}
+
 static const luaL_Reg lib[] = {
     {NULL, NULL}
 };
 
 extern "C" int luaopen_runtime(lua_State* L) {
     
+    lua_pushcfunction(L, l_pack);
+    lua_setglobal(L, XENON_PACK);
+
     lua_pushcfunction(L, l_runtime_import);
     lua_setglobal(L, "import");
 
