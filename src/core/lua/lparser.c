@@ -2085,8 +2085,6 @@ static void retstat (LexState *ls) {
 static void includestat(LexState* ls) {
     FuncState* fs = ls->fs;
 
-    luaX_next(ls);
-
     if (ls->t.token != TK_STRING)
         luaX_syntaxerror(ls, "String literal expected after 'include'");
 
@@ -2144,14 +2142,6 @@ static void statement (LexState *ls) {
       funcstat(ls, line);
       break;
     }
-    case TK_LOCAL: {  /* stat -> localstat */
-      luaX_next(ls);  /* skip LOCAL */
-      if (testnext(ls, TK_FUNCTION))  /* local function? */
-        localfunc(ls);
-      else
-        localstat(ls);
-      break;
-    }
     case TK_LET:
         luaX_next(ls);  /* skip LOCAL */
         if (testnext(ls, TK_FUNCTION))  /* local function? */
@@ -2179,6 +2169,7 @@ static void statement (LexState *ls) {
       break;
     }
     case TK_INCLUDE: {
+        luaX_next(ls);
         includestat(ls);
         break;
     }
