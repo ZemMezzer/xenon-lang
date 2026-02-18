@@ -196,15 +196,52 @@ static int xl_directory_is_directory(lua_State* L) {
     return 1;
 }
 
+static int xl_directory_get_parent_directory(lua_State* L) {
+    int top_index = lua_gettop(L);
+    if (!is_xstring(L, top_index)) {
+        return luaL_error(L, invalid_path_exception_message);
+    }
+    std::string path = xstring_check(L, top_index)->to_std_string();
+    std::string directory_path = xenon_get_parent_path(path);
+    if (directory_path.size() <= 0) {
+        return luaL_error(L, invalid_path_exception_message);
+    }
+    xstring_push(L, directory_path.c_str(), directory_path.size());
+    return 1;
+}
+
+static int xl_directory_combine_path(lua_State* L) {
+    int top_index = lua_gettop(L);
+    if (top_index < 2) {
+        return luaL_error(L, "Expected at least 2 arguments");
+    }
+    std::filesystem::path combined_path;
+    for (int i = 1; i <= top_index; ++i) {
+        if (!is_xstring(L, i)) {
+            return luaL_error(L, invalid_path_exception_message);
+        }
+        std::string part = xstring_check(L, i)->to_std_string();
+        if (combined_path.empty()) {
+            combined_path = part;
+        } else {
+            combined_path = std::filesystem::path(combined_path) / part;
+        }
+    }
+    xstring_push(L, combined_path.string().c_str(), combined_path.string().size());
+	return 1;
+}
+
 static const luaL_Reg lib[] = {
     {"get_path", xl_directory_get_absolute_path},
     {"get_home_path", xl_directory_get_home_path},
     {"set_home_path", xl_directory_set_home_path},
+	{"parent", xl_directory_get_parent_directory},
     {"get_files", xl_directory_get_files},
     {"create", xl_directory_create_directory},
     {"exists", xl_directory_directory_exists},
     {"remove", xl_directory_remove_directory},
     {"is_directory", xl_directory_is_directory},
+	{"combine", xl_directory_combine_path},
     {NULL, NULL}
 };
 
