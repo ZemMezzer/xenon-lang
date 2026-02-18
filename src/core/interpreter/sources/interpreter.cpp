@@ -2,6 +2,7 @@
 #include "xenonstd.h"
 #include "runtime.h"
 #include "xdirectory.h"
+#include "xerror.h"
 
 extern "C" {
 #include "lua.h"

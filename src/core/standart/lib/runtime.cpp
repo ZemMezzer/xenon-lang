@@ -4,6 +4,8 @@
 #include "preprocessor.h"
 #include "xdirectory.h"
 #include "registry.h"
+#include "xerror.h"
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -65,29 +67,6 @@ static int xenon_include_file(lua_State* L, const std::string& file) {
 
     xenon_registry_set_state_number(L, XENON_INCLUDE_STATE, resolved, 0);
     return lua_error(L);
-}
-
-static void xenon_raise(lua_State* L, int code) {
-    if (lua_istable(L, -1)) {
-        lua_getfield(L, -1, "code");
-        bool hasCode = lua_isinteger(L, -1);
-        lua_pop(L, 1);
-
-        lua_getfield(L, -1, "message");
-        bool hasMsg = lua_isstring(L, -1);
-        lua_pop(L, 1);
-
-        if (hasCode && hasMsg) return;
-    }
-
-    const char* msg = lua_tostring(L, -1);
-    lua_pop(L, 1);
-
-    lua_createtable(L, 0, 2);
-    lua_pushinteger(L, code);
-    lua_setfield(L, -2, "code");
-    lua_pushstring(L, msg ? msg : "unknown");
-    lua_setfield(L, -2, "message");
 }
 
 static int xl_runtime_import(lua_State* L) {
@@ -171,45 +150,6 @@ static int xl_pack(lua_State* L) {
         lua_rawseti(L, -2, i);
     }
     return 1;
-}
-
-extern "C" void xenon_throw(lua_State* L) {
-    int code = LUA_ERRRUN;
-    const char* msg = NULL;
-
-    if (lua_istable(L, -1)) {
-        lua_getfield(L, -1, "code");
-        if (lua_isinteger(L, -1)) code = (int)lua_tointeger(L, -1);
-        lua_pop(L, 1);
-
-        lua_getfield(L, -1, "message");
-        msg = lua_tostring(L, -1);
-        lua_pop(L, 1);
-    }
-    else {
-        msg = lua_tostring(L, -1);
-    }
-
-    if (code == LUA_ERRSYNTAX) {
-        std::cerr
-            << std::endl
-            << "Xenon Exception"
-            << std::endl
-            << "  Syntax Error: "
-            << (msg ? msg : "unknown")
-            << std::endl;
-    }
-    else {
-        std::cerr
-            << std::endl
-            << "Xenon Exception"
-            << std::endl
-            << "  Uncaught Exception:"
-            << std::endl
-            << std::endl
-            << (msg ? msg : "unknown")
-            << std::endl;
-    }
 }
 
 static const luaL_Reg lib[] = {
