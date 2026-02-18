@@ -7,5 +7,5 @@ extern "C" {
 #include "lua.h"
 }
 
-bool xenon_file_exists(lua_State* L, const std::string& path);
+bool xenon_file_exists(const std::string& path);
 extern "C" int xenon_openlib_file(lua_State* L);

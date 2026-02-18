@@ -12,8 +12,8 @@
 
 static const char* empty_content_exception_message = "Empty content";
 
-bool xenon_file_exists(lua_State* L, const std::string& path) {
-	std::string absolute_path = xenon_make_absolute_path(L, path);
+bool xenon_file_exists(const std::string& path) {
+	std::string absolute_path = xenon_get_absolute_path(path);
     std::filesystem::path p(absolute_path);
 	return std::filesystem::exists(p) && std::filesystem::is_regular_file(p);
 }
@@ -24,7 +24,7 @@ static int xl_file_exists(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
 
     std::filesystem::path p(path);
 
@@ -39,7 +39,7 @@ static int xl_file_read_all_text(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::ifstream file(path);
     if (!file.is_open()) {
 		std::string error_message = "Failed to open file: " + path;
@@ -63,7 +63,7 @@ static int xl_file_write_all_text(lua_State* L) {
 
     std::string path = xstring_check(L, top_index - 1)->to_std_string();
     std::string content = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::ofstream file(path);
 
     if(!file.good()) {
@@ -84,7 +84,7 @@ static int xl_file_remove_file(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     if (!std::filesystem::exists(p)) {
 
@@ -109,7 +109,7 @@ static int xl_file_get_file_name(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     if (!std::filesystem::exists(p)) {
         std::string error_message = "File does not exist: " + path;
@@ -130,7 +130,7 @@ static int xl_file_is_file(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     bool is_file = std::filesystem::exists(p) && std::filesystem::is_regular_file(p);
     lua_pushboolean(L, is_file);

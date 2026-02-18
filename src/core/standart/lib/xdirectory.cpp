@@ -9,17 +9,14 @@
 static const std::string RK_HOME_PATH = "home_path";
 
 std::string xenon_get_absolute_path(const std::string& path) {
-    char fullpath[4096];
 
-#ifdef _WIN32
-    if (_fullpath(fullpath, path.c_str(), sizeof(fullpath)) != NULL)
-        return std::string(fullpath);
-#else
-    if (realpath(path.c_str(), fullpath) != NULL)
-        return std::string(fullpath);
-#endif
+	std::filesystem::path p(path);
 
-    return path;
+    if(p.is_absolute()) {
+        return path;
+	}
+
+    return std::filesystem::absolute(p).string();
 }
 
 void xenon_set_home_path(lua_State* L, const std::string& hpath) {
@@ -30,33 +27,14 @@ std::string xenon_get_home_directory(lua_State* L) {
     return xenon_registry_get_state_string(L, XENON_STATE, RK_HOME_PATH);
 }
 
-std::string xenon_get_directory_path(const std::string& path) {
-    std::string result;
-    size_t pos = path.find_last_of("/\\");
-    if (pos != std::string::npos) {
-        result = path.substr(0, pos);
-    }
-    else {
-        result = ".";
-    }
-
-    return result;
+std::string xenon_get_parent_path(const std::string& path) {
+    std::filesystem::path p(path);
+    return p.parent_path().string();
 }
 
 bool xenon_is_absolute_path(const std::string& path) {
     std::filesystem::path p(path);
     return p.is_absolute();
-}
-
-std::string xenon_make_absolute_path(lua_State* L, const std::string& path) {
-    if (xenon_is_absolute_path(path)) {
-        return path;
-    }
-    else {
-        std::filesystem::path home(xenon_get_home_directory(L));
-        std::filesystem::path p = home / path;
-        return p.string();
-    }
 }
 
 static int xl_directory_get_home_path(lua_State* L) {
@@ -106,7 +84,7 @@ static int xl_directory_get_directory_path(lua_State* L) {
     }
 
     std::string path = xstring_check(L, top_index)->to_std_string();
-    std::string directory_path = xenon_get_directory_path(path);
+    std::string directory_path = xenon_get_parent_path(path);
 
     if (directory_path.size() <= 0) {
         return luaL_error(L, invalid_path_exception_message);
@@ -122,7 +100,7 @@ static int xl_directory_get_files(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     if (!std::filesystem::exists(p)) {
         std::string error_message = "Directory does not exist: " + path;
@@ -152,7 +130,7 @@ static int xl_directory_create_directory(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     if (std::filesystem::exists(p)) {
         std::string error_message = "Directory already exists: " + path;
@@ -173,7 +151,7 @@ static int xl_directory_directory_exists(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     bool exists = std::filesystem::exists(p) && std::filesystem::is_directory(p);
     lua_pushboolean(L, exists);
@@ -186,7 +164,7 @@ static int xl_directory_remove_directory(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     if (!std::filesystem::exists(p)) {
         std::string error_message = "Directory does not exist: " + path;
@@ -211,7 +189,7 @@ static int xl_directory_is_directory(lua_State* L) {
         return luaL_error(L, invalid_path_exception_message);
     }
     std::string path = xstring_check(L, top_index)->to_std_string();
-    path = xenon_make_absolute_path(L, path);
+    path = xenon_get_absolute_path(path);
     std::filesystem::path p(path);
     bool is_directory = std::filesystem::exists(p) && std::filesystem::is_directory(p);
     lua_pushboolean(L, is_directory);

@@ -16,7 +16,7 @@ int Interpreter::do_file(const char* file_path){
     std::string full_path = xenon_get_absolute_path(file_path);
 
     if(full_path.size() > 0){
-        xenon_set_home_path(l, xenon_get_directory_path(full_path));
+        xenon_set_home_path(l, xenon_get_parent_path(full_path));
     }
 
 	int status = xenon_do_file(l, file_path);
