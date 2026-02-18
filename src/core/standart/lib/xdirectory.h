@@ -7,8 +7,6 @@ extern "C" {
 
 #include <string>
 
-static std::string home_path;
-
 std::string xenon_make_absolute_path(lua_State* L, const std::string& path);
 std::string xenon_get_absolute_path(const std::string& relative_path);
 std::string xenon_get_directory_path(const std::string& path);

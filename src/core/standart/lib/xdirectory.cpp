@@ -1,9 +1,12 @@
 #include "xdirectory.h"
 #include "xstring.h"
 #include "xerror.h"
+#include "registry.h"
 
 #include <string>
 #include <filesystem>
+
+static const std::string RK_HOME_PATH = "home_path";
 
 std::string xenon_get_absolute_path(const std::string& path) {
     char fullpath[4096];
@@ -20,11 +23,11 @@ std::string xenon_get_absolute_path(const std::string& path) {
 }
 
 void xenon_set_home_path(lua_State* L, const std::string& hpath) {
-    home_path = hpath;
+    xenon_registry_set_state_string(L, XENON_STATE, RK_HOME_PATH, hpath);
 }
 
 std::string xenon_get_home_directory(lua_State* L) {
-    return home_path;
+    return xenon_registry_get_state_string(L, XENON_STATE, RK_HOME_PATH);
 }
 
 std::string xenon_get_directory_path(const std::string& path) {
@@ -57,6 +60,7 @@ std::string xenon_make_absolute_path(lua_State* L, const std::string& path) {
 }
 
 static int xl_directory_get_home_path(lua_State* L) {
+	std::string home_path = xenon_get_home_directory(L);
     xstring_push(L, home_path.c_str(), home_path.size());
     return 1;
 }
@@ -70,7 +74,7 @@ static int xl_directory_set_home_path(lua_State* L) {
     }
 
     std::string path = xstring_check(L, top_index)->to_std_string();
-    home_path = path;
+	xenon_set_home_path(L, path);
     return 0;
 }
 
