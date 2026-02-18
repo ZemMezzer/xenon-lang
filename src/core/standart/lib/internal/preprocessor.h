@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 void lua_register_keyword(const std::string& keyword, const std::string& result);

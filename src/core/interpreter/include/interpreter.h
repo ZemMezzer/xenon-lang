@@ -8,11 +8,6 @@ extern "C" {
 
 class Interpreter {
 public:
-    Interpreter();
-    ~Interpreter();
-
     int do_arg(const Arg& arg);
     int do_file(const char* file_path);
-private:
-    lua_State* m_state;
 };

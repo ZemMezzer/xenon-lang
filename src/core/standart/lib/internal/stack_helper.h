@@ -1,4 +1,10 @@
+#pragma once
+
 extern "C" {
     #include "lua.h"
+    #include <lauxlib.h>
 }
-int get_function_arg_top_index(lua_State* L);
+
+#include <string>
+
+std::string stack_value_to_string(lua_State* L, int idx);

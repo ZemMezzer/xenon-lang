@@ -1,9 +1,10 @@
 #include "runtime.h"
 #include "stack_helper.h"
 #include "xstring.h"
-#include "lua.h"
 #include "preprocessor.h"
-#include "filesystem.h"
+#include "xdirectory.h"
+#include "registry.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -11,14 +12,12 @@
 #include <unordered_map>
 
 extern "C" {
-#include "lauxlib.h"
-#include "llex.h"
+    #include "lauxlib.h"
+    #include "llex.h"
+    #include "lua.h"
 }
 
-static constexpr const char* XENON_CUR_FILE_STACK = "xenon.current_file_stack";
-static constexpr const char* XENON_LOADED = "xenon.loaded";
-static constexpr const char* XENON_LOADING = "xenon.loading";
-
+static constexpr const char* XENON_INCLUDE_STATE = "xenon.include_state";
 static const char* invalid_arg_exception_message = "Invalid argument";
 
 static std::unordered_map<std::string, lua_CFunction> xenon_modules;
@@ -34,124 +33,38 @@ static int xenon_try_include_builtin(lua_State* L, const std::string& module_nam
     return 1;
 }
 
-static std::string xenon_get_current_file(lua_State* L) {
-    lua_getfield(L, LUA_REGISTRYINDEX, XENON_CUR_FILE_STACK);
-    if (!lua_istable(L, -1)) { lua_pop(L, 1); return {}; }
-    lua_Integer n = (lua_Integer)lua_rawlen(L, -1);
-    if (n <= 0) { lua_pop(L, 1); return {}; }
-
-    lua_rawgeti(L, -1, n);
-    const char* s = lua_tostring(L, -1);
-    std::string r = s ? s : "";
-    lua_pop(L, 2);
-    return r;
-}
-
 static std::string xenon_resolve_path(lua_State* L, const std::string& file) {
-    if (!file.empty() && file[0] == '/') {
-        return file;
+    std::filesystem::path p(file);
+
+    if (p.is_absolute())
+        return p.lexically_normal().generic_string();
+
+    std::filesystem::path candidate = (std::filesystem::path(xenon_get_home_directory(L)) / p).lexically_normal();
+
+    std::error_code ec;
+    if (std::filesystem::exists(candidate, ec) && !ec)
+        return candidate.generic_string();
+
+    return candidate.generic_string();
+}
+
+static int xenon_include_file(lua_State* L, const std::string& file) {
+    std::string resolved = xenon_resolve_path(L, file);
+
+    lua_Integer st = xenon_registry_get_state_number(L, XENON_INCLUDE_STATE, resolved);
+    if (st == 1) return luaL_error(L, "Circular include detected: %s", resolved.c_str());
+    if (st == 2) return 0;
+
+    xenon_registry_set_state_number(L, XENON_INCLUDE_STATE, resolved, 1);
+    int rc = xenon_do_file(L, resolved);
+
+    if (rc == LUA_OK) {
+        xenon_registry_set_state_number(L, XENON_INCLUDE_STATE, resolved, 2);
+        return 0;
     }
 
-    std::string cur = xenon_get_current_file(L);
-    if (!cur.empty()) {
-        std::string base = xenon_dirname_posix(cur);
-        std::string candidate = xenon_normalize_posix(
-            xenon_join_posix(base, file)
-        );
-
-        if (xenon_file_exists(candidate)) {
-            return candidate;
-        }
-    }
-
-    std::string home = xenon_get_home_directory();
-    std::string homeCandidate = xenon_normalize_posix(
-        xenon_join_posix(home, file)
-    );
-
-    if (xenon_file_exists(homeCandidate)) {
-        return homeCandidate;
-    }
-
-    return homeCandidate;
-}
-
-static void xenon_get_or_create_reg_table(lua_State* L, const char* key) {
-    lua_getfield(L, LUA_REGISTRYINDEX, key);
-    if (!lua_istable(L, -1)) {
-        lua_pop(L, 1);
-        lua_newtable(L);
-        lua_pushvalue(L, -1);
-        lua_setfield(L, LUA_REGISTRYINDEX, key);
-    }
-}
-
-static bool xenon_reg_table_get_bool(lua_State* L, const char* key, const std::string& k) {
-    xenon_get_or_create_reg_table(L, key);
-    lua_pushlstring(L, k.c_str(), k.size());
-    lua_gettable(L, -2);
-    bool r = lua_toboolean(L, -1) != 0;
-    lua_pop(L, 2);
-    return r;
-}
-
-static void xenon_reg_table_set_bool(lua_State* L, const char* key, const std::string& k, bool v) {
-    xenon_get_or_create_reg_table(L, key);
-    lua_pushlstring(L, k.c_str(), k.size());
-    lua_pushboolean(L, v ? 1 : 0);
-    lua_settable(L, -3);
-    lua_pop(L, 1);
-}
-
-static void xenon_reg_table_set_nil(lua_State* L, const char* key, const std::string& k) {
-    xenon_get_or_create_reg_table(L, key);
-    lua_pushlstring(L, k.c_str(), k.size());
-    lua_pushnil(L);
-    lua_settable(L, -3);
-    lua_pop(L, 1);
-}
-
-static void xenon_push_current_file(lua_State* L, const std::string& f) {
-    xenon_get_or_create_reg_table(L, XENON_CUR_FILE_STACK);
-    lua_Integer n = (lua_Integer)lua_rawlen(L, -1);
-    lua_pushlstring(L, f.c_str(), f.size());
-    lua_rawseti(L, -2, n + 1);
-    lua_pop(L, 1);
-}
-
-static void xenon_pop_current_file(lua_State* L) {
-    lua_getfield(L, LUA_REGISTRYINDEX, XENON_CUR_FILE_STACK);
-    if (lua_istable(L, -1)) {
-        lua_Integer n = (lua_Integer)lua_rawlen(L, -1);
-        if (n > 0) {
-            lua_pushnil(L);
-            lua_rawseti(L, -2, n);
-        }
-    }
-    lua_pop(L, 1);
-}
-
-static bool xenon_is_loaded(lua_State* L, const std::string& resolvedPath) {
-    return xenon_reg_table_get_bool(L, XENON_LOADED, resolvedPath);
-}
-
-static bool xenon_is_loading(lua_State* L, const std::string& resolvedPath) {
-    return xenon_reg_table_get_bool(L, XENON_LOADING, resolvedPath);
-}
-
-static void xenon_mark_loading(lua_State* L, const std::string& resolvedPath) {
-    xenon_reg_table_set_bool(L, XENON_LOADING, resolvedPath, true);
-}
-
-static void xenon_mark_loaded(lua_State* L, const std::string& resolvedPath, bool ok) {
-    xenon_reg_table_set_nil(L, XENON_LOADING, resolvedPath);
-
-    if (ok) {
-        xenon_reg_table_set_bool(L, XENON_LOADED, resolvedPath, true);
-    }
-    else {
-        xenon_reg_table_set_nil(L, XENON_LOADED, resolvedPath);
-    }
+    xenon_registry_set_state_number(L, XENON_INCLUDE_STATE, resolved, 0);
+    return lua_error(L);
 }
 
 static void xenon_raise(lua_State* L, int code) {
@@ -178,7 +91,7 @@ static void xenon_raise(lua_State* L, int code) {
 }
 
 static int xl_runtime_import(lua_State* L) {
-    int top_index = get_function_arg_top_index(L);
+    int top_index = lua_gettop(L);
     std::string file = xstring_to_std_string(L, top_index);
     std::string full_path = xenon_resolve_path(L, file);
 
@@ -239,26 +152,6 @@ static int xl_runtime_import(lua_State* L) {
 	return nret; //return number of return values from chunk
 }
 
-static int xl_include_file(lua_State* L, const std::string& file) {
-    std::string resolved = xenon_resolve_path(L, file);
-
-    if (xenon_is_loading(L, resolved)) {
-        return luaL_error(L, "Circular include detected: %s", resolved.c_str());
-    }
-    if (xenon_is_loaded(L, resolved)) {
-        return 0;
-    }
-
-    xenon_mark_loading(L, resolved);
-    int rc = xenon_do_file(L, resolved);
-    xenon_mark_loaded(L, resolved, rc == 0);
-
-    if (rc != LUA_OK) {
-        return lua_error(L);
-    }
-    return 0;
-}
-
 static int xl_xenon_include(lua_State* L) {
     std::string name = xstring_to_std_string(L, 1);
 
@@ -266,7 +159,7 @@ static int xl_xenon_include(lua_State* L) {
         return 0;
     }
 
-    return xl_include_file(L, name);
+    return xenon_include_file(L, name);
 }
 
 static int xl_pack(lua_State* L) {

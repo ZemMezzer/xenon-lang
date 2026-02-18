@@ -1,8 +1,12 @@
 #include "stack_helper.h"
 
-int get_function_arg_top_index(lua_State* L){
-    if(lua_istable(L, 1)) {
-        return 2;
-    } 
-    return 1;
+std::string stack_value_to_string(lua_State* L, int idx) {
+    size_t len;
+    const char* str = luaL_tolstring(L, idx, &len);
+
+    std::string result(str, len);
+
+    lua_pop(L, 1);
+
+    return result;
 }

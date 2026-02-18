@@ -1,34 +1,27 @@
 #include "interpreter.h"
 #include "xenonstd.h"
 #include "runtime.h"
-#include "filesystem.h"
+#include "xdirectory.h"
 
 extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
 }
 
-Interpreter::Interpreter(){
-    m_state = luaL_newstate();
-    xenon::std::init(m_state);
-}
-
-Interpreter::~Interpreter(){
-    lua_close(m_state);
-}
-
 int Interpreter::do_file(const char* file_path){
+    lua_State* l = luaL_newstate();
+    xenon::std::init(l);
 
     std::string full_path = xenon_get_absolute_path(file_path);
 
     if(full_path.size() > 0){
-        xenon_set_home_path(xenon_get_directory_path(full_path));
+        xenon_set_home_path(l, xenon_get_directory_path(full_path));
     }
 
-	int status = xenon_do_file(m_state, file_path);
+	int status = xenon_do_file(l, file_path);
 
     if (status != LUA_OK) {
-        xenon_throw(m_state);
+        xenon_throw(l);
     }
 
     return status;

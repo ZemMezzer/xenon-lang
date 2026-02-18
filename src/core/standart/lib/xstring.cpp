@@ -1,5 +1,5 @@
 #include "xstring.h"
-#include "xerror.hpp"
+#include "xerror.h"
 #include "stack_helper.h"
 #include <string.h>
 #include <ctype.h>
@@ -503,18 +503,28 @@ static int xl_is_empty(lua_State* L) {
 	return 1;
 }
 
-static int add(lua_State* L) {
-	XString* a = (XString*)luaL_checkudata(L, 1, lib_name);
-	XString* b = (XString*)luaL_checkudata(L, 2, lib_name);
+static std::string get_string_by_index(lua_State* L, int idx) {
+	if(!lua_isuserdata(L, idx)) {
+		return stack_value_to_string(L, idx);
+	}
 
-	size_t len = (size_t)a->length + (size_t)b->length;
+	XString* xs = (XString*)luaL_checkudata(L, idx, lib_name);
+	return xs->to_std_string();
+}
+
+static int add(lua_State* L) {
+
+	std::string a = get_string_by_index(L, 1);
+	std::string b = get_string_by_index(L, 2);
+
+	size_t len = (size_t)a.length() + (size_t)b.length();
 
 	XString* out = (XString*)lua_newuserdata(L, sizeof(XString) + len + 1);
 	out->length = (int)len;
 	out->string = (char*)(out + 1);
 
-	memcpy(out->string, a->string, a->length);
-	memcpy(out->string + a->length, b->string, b->length);
+	memcpy(out->string, a.c_str(), a.length());
+	memcpy(out->string + a.length(), b.c_str(), b.length());
 	out->string[len] = '\0';
 
 	luaL_getmetatable(L, lib_name);
@@ -617,11 +627,40 @@ static void create_lib(lua_State* L) {
 }
 
 XString* xstring_check(lua_State* L, int index) {
+
+	if(lua_isstring(L, index)) {
+		size_t len;
+		const char* s = lua_tolstring(L, index, &len);
+		XString* xs = (XString*)lua_newuserdata(L, sizeof(XString) + len + 1);
+		xs->length = (int)len;
+		xs->string = (char*)(xs + 1);
+		memcpy(xs->string, s, len);
+		xs->string[len] = '\0';
+		luaL_getmetatable(L, lib_name);
+		lua_setmetatable(L, -2);
+		return xs;
+	}
+
 	return (XString*)luaL_checkudata(L, index, lib_name);
 }
+
+bool is_xstring(lua_State* L, int index) {
+	return luaL_testudata(L, index, lib_name) != nullptr || lua_isstring(L, index);
+}
+
 std::string xstring_to_std_string(lua_State* L, int idx) {
 	XString* xs = xstring_check(L, idx);
 	return std::string(xs->string, xs->length);
+}
+
+void xstring_push(lua_State* L, const char* str, size_t length) {
+	XString* xs = (XString*)lua_newuserdata(L, sizeof(XString) + length + 1);
+	xs->length = (int)length;
+	xs->string = (char*)(xs + 1);
+	memcpy(xs->string, str, length);
+	xs->string[length] = '\0';
+	luaL_getmetatable(L, lib_name);
+	lua_setmetatable(L, -2);
 }
 
 extern "C" int xenon_openlib_xstring(lua_State* L) {

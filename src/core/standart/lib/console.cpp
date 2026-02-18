@@ -12,7 +12,7 @@ static int xl_console_readln(lua_State* L) {
     std::string input;
     std::getline(std::cin, input);
 
-    lua_pushlstring(L, input.c_str(), input.size());
+    xstring_push(L, input.c_str(), input.size());
     return 1;
 }
 
@@ -22,9 +22,7 @@ static int xl_console_write(lua_State* L) {
 
     for (int i = 1; i <= top; i++) {
 
-        luaL_tolstring(L, i, nullptr);
-        std::cout << lua_tostring(L, -1);
-        lua_pop(L, 1);
+        std::cout << stack_value_to_string(L, i);
 
         if (i < top)
             std::cout << "\t" << std::flush;
