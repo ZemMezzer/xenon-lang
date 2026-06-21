@@ -1,3 +1,5 @@
+![Preview](.github/preview.png)
+
 # Xenon Lang
 
 Xenon Lang is an experimental scripting language built on top of a modified Lua runtime.
